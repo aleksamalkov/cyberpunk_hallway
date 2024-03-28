@@ -7,6 +7,7 @@ cyberpunk_hallway
 
 build/
 .vscode/
+.cache/
 
 ### bin ###
 bin/
