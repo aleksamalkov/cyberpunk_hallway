@@ -20,8 +20,6 @@
 #include <vector>
 #include <array>
 
-void process_input(GLFWwindow *window);
-
 unsigned load_texture(const std::string& filename)
 {
     unsigned texture{};
@@ -49,20 +47,20 @@ unsigned load_texture(const std::string& filename)
 
 class Plane {
 public:
-    explicit Plane(std::vector<glm::vec3> vertex_pos, unsigned texture, float texture_size_coeff = 1.0f)
+    explicit Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, float texture_size_coeff = 1.0f)
         : m_texture{texture}
     {
         const float texture_coords = 1.0f / texture_size_coeff;
         constexpr int vertex_size = 5;
         const float vertices[] {
-            vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, texture_coords, texture_coords, // top right
-            vertex_pos[1].x, vertex_pos[1].y, vertex_pos[1].z, texture_coords, 0.0f,           // bottom right
-            vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, 0.0f,           0.0f,           // bottom left
-            vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, 0.0f,           texture_coords  // top left 
+                vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, 0.0f,           0.0f,           // bottom left
+                vertex_pos[1].x, vertex_pos[1].y, vertex_pos[1].z, texture_coords, 0.0f,           // bottom right
+                vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, texture_coords, texture_coords, // top right
+                vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, 0.0f,           texture_coords  // top left
         };
         const unsigned indices[] = {
-            0, 1, 3, // first triangle
-            1, 2, 3  // second triangle
+            0, 1, 2, // first triangle
+            2, 3, 0  // second triangle
         };
 
         // TODO: destruct them later
@@ -115,9 +113,19 @@ private:
     unsigned m_EBO{};
 };
 
+struct State
+{
+    Camera camera{};
+    double mouse_pos_x{};
+    double mouse_pos_y{};
+};
+
+void process_input(GLFWwindow *window, State& state, float delta_time);
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+
 // screen dimensions
-constexpr int screen_width = 800;
-constexpr int screen_height = 600;
+constexpr float screen_width = 800.0f;
+constexpr float screen_height = 600.0f;
 
 int main() {
     // glfw: initialize and configure
@@ -136,8 +144,12 @@ int main() {
         return -1;
     }
     glfwMakeContextCurrent(window);
-    // tell GLFW to capture our mouse
-//    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    State state;
+    glfwGetCursorPos(window, &state.mouse_pos_x, &state.mouse_pos_y);
+    glfwSetWindowUserPointer(window, &state);
+    glfwSetCursorPosCallback(window, mouse_callback);
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -169,10 +181,21 @@ int main() {
     // load models
     // -----------
     const auto texture = load_texture("container.jpg");
-    Plane floor({{0.5f, 0.5f, 0.0f}, {0.5f, -0.5f, 0.0f}, {-0.5f, -0.5f, 0.0f}, {-0.5f, 0.5f, 0.0f}}, texture, 0.7);
+    std::vector<Plane> planes;
+    constexpr float hallway_length = 10.f / 2.f;
+    constexpr float hallway_height = 5.f / 2.f;
+    constexpr float hallway_width = 5.f / 2.f;
+    planes.emplace_back(
+            std::vector<glm::vec3>{
+                    {-hallway_width, -hallway_height, -hallway_length},
+                    {hallway_width,  -hallway_height, -hallway_length},
+                    {hallway_width,  -hallway_height, hallway_length},
+                    {-hallway_width, -hallway_height, hallway_length},
+            }, texture, 0.7
+    );
 
     // draw in wireframe
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+//    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     constexpr glm::vec3 clear_color{0.0f, 0.0f, 0.0f};
 
@@ -190,7 +213,7 @@ int main() {
 
         // input
         // -----
-        process_input(window);
+        process_input(window, state, delta_time);
 
 
         // render
@@ -198,7 +221,16 @@ int main() {
         glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        floor.draw(shader);
+        const auto projection = glm::perspective(glm::radians(45.0f), screen_width / screen_height, 0.1f, 100.0f);
+        const auto view = state.camera.GetViewMatrix();
+
+        shader.setMat4("model", glm::mat4(1.0f));
+        shader.setMat4("view", state.camera.GetViewMatrix());
+        shader.setMat4("projection", projection);
+
+        for (auto& plane : planes) {
+            plane.draw(shader);
+        }
 
 
         // glfw: swap buffers and poll IO events
@@ -218,7 +250,33 @@ int main() {
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void process_input(GLFWwindow *window) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+void process_input(GLFWwindow *window, State& state, float delta_time){
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, true);
+    }
+
+    auto& camera = state.camera;
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        camera.ProcessKeyboard(FORWARD, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        camera.ProcessKeyboard(LEFT, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        camera.ProcessKeyboard(BACKWARD, delta_time);
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        camera.ProcessKeyboard(RIGHT, delta_time);
+    }
+}
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    auto* state = static_cast<State*>(glfwGetWindowUserPointer(window));
+
+    const double x_offset = xpos - state->mouse_pos_x;
+    state->mouse_pos_x = xpos;
+    const double y_offset = state->mouse_pos_y - ypos;
+    state->mouse_pos_y = ypos;
+    state->camera.ProcessMouseMovement(static_cast<float>(x_offset), static_cast<float>(y_offset));
 }
