@@ -17,6 +17,16 @@
 #include <stdexcept>
 #include <vector>
 
+struct Settings
+{
+    glm::vec3 ambient {0.05f, 0.05f, 0.05f};
+    glm::vec3 diffuse {0.8f, 0.8f, 0.8f};
+    glm::vec3 specular {1.0f, 1.0f, 1.0f};
+    float constant = 1.0f;
+    float linear = 0.35f;
+    float quadratic = 0.44f;
+};
+
 unsigned load_texture(const std::string& filename)
 {
     unsigned texture{};
@@ -128,6 +138,7 @@ struct State
     Camera camera{};
     double mouse_pos_x{};
     double mouse_pos_y{};
+    bool gui_enabled{};
 };
 
 struct Light {
@@ -169,13 +180,36 @@ std::vector<Plane> generate_hallway(float width, float height, float length, uns
 }
 
 void process_input(GLFWwindow *window, State& state, float delta_time);
-void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos);
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
 // screen dimensions
 constexpr float screen_width = 800.0f;
 constexpr float screen_height = 600.0f;
 
+void draw_gui(Settings& settings, const State& state)
+{
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::Begin("Settings");
+    ImGui::ColorEdit3("ambient", reinterpret_cast<float *>(&settings.ambient));
+    ImGui::ColorEdit3("diffuse", reinterpret_cast<float *>(&settings.diffuse));
+    ImGui::ColorEdit3("specular", reinterpret_cast<float *>(&settings.specular));
+    ImGui::DragFloat("pointLight.constant", &settings.constant, 0.01, 0.0, 1.0);
+    ImGui::DragFloat("pointLight.linear", &settings.linear, 0.01, 0.0, 1.0);
+    ImGui::DragFloat("pointLight.quadratic", &settings.quadratic, 0.01, 0.0, 1.0);
+    ImGui::End();
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
 int main() {
+    Settings settings;
+    State state;
+
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -193,11 +227,12 @@ int main() {
     }
     glfwMakeContextCurrent(window);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
-    State state;
-    glfwGetCursorPos(window, &state.mouse_pos_x, &state.mouse_pos_y);
     glfwSetWindowUserPointer(window, &state);
-    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetCursorPosCallback(window, cursor_pos_callback);
+    glfwSetKeyCallback(window, key_callback);
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -213,7 +248,8 @@ int main() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void) io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330 core");
@@ -271,20 +307,20 @@ int main() {
         shader.setMat4("projection", projection);
         // point light 1
         shader.setVec3("lights[0].position", glm::vec3{1.f, 1.f, 1.f});
-        shader.setVec3("lights[0].ambient", 0.05f, 0.05f, 0.05f);
-        shader.setVec3("lights[0].diffuse", 0.8f, 0.8f, 0.8f);
-        shader.setVec3("lights[0].specular", 1.0f, 1.0f, 1.0f);
-        shader.setFloat("lights[0].constant", 1.0f);
-        shader.setFloat("lights[0].linear", 0.35f);
-        shader.setFloat("lights[0].quadratic", 0.44f);
+        shader.setVec3("lights[0].ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
+        shader.setVec3("lights[0].diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
+        shader.setVec3("lights[0].specular", settings.specular.r, settings.specular.g, settings.specular.b);
+        shader.setFloat("lights[0].constant", settings.constant);
+        shader.setFloat("lights[0].linear", settings.linear);
+        shader.setFloat("lights[0].quadratic", settings.quadratic);
         // point light 2
         shader.setVec3("lights[1].position", glm::vec3{4.f, 4.f, 6.f});
-        shader.setVec3("lights[1].ambient", 0.05f, 0.05f, 0.05f);
-        shader.setVec3("lights[1].diffuse", 0.8f, 0.8f, 0.8f);
-        shader.setVec3("lights[1].specular", 1.0f, 1.0f, 1.0f);
-        shader.setFloat("lights[1].constant", 1.0f);
-        shader.setFloat("lights[1].linear", 0.35f);
-        shader.setFloat("lights[1].quadratic", 0.44f);
+        shader.setVec3("lights[1].ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
+        shader.setVec3("lights[1].diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
+        shader.setVec3("lights[1].specular", settings.specular.r, settings.specular.g, settings.specular.b);
+        shader.setFloat("lights[1].constant", settings.constant);
+        shader.setFloat("lights[1].linear", settings.linear);
+        shader.setFloat("lights[1].quadratic", settings.quadratic);
 
         shader.setFloat("material.shininess", 32);
         shader.setVec3("viewPos", state.camera.Position);
@@ -297,6 +333,8 @@ int main() {
         shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(3.f, 3.f, 3.f)));
         model.Draw(shader);
 
+        if (state.gui_enabled)
+            draw_gui(settings, state);
 
         // glfw: swap buffers and poll IO events
         // -------------------------------------------------------------------------------
@@ -316,10 +354,6 @@ int main() {
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void process_input(GLFWwindow *window, State& state, float delta_time){
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, true);
-    }
-
     auto& camera = state.camera;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
         camera.ProcessKeyboard(FORWARD, delta_time);
@@ -335,7 +369,7 @@ void process_input(GLFWwindow *window, State& state, float delta_time){
     }
 }
 
-void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos)
 {
     auto* state = static_cast<State*>(glfwGetWindowUserPointer(window));
 
@@ -343,5 +377,25 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     state->mouse_pos_x = xpos;
     const double y_offset = state->mouse_pos_y - ypos;
     state->mouse_pos_y = ypos;
-    state->camera.ProcessMouseMovement(static_cast<float>(x_offset), static_cast<float>(y_offset));
+
+    if (!state->gui_enabled) {
+        state->camera.ProcessMouseMovement(static_cast<float>(x_offset), static_cast<float>(y_offset));
+    }
+}
+
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, true);
+    }
+
+    auto* state = static_cast<State*>(glfwGetWindowUserPointer(window));
+
+    if ((key == GLFW_KEY_F1 || key == GLFW_KEY_Q) && action == GLFW_PRESS) {
+        state->gui_enabled = !state->gui_enabled;
+        if (state->gui_enabled) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        } else {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+    }
 }
