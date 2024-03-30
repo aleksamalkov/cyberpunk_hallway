@@ -7,7 +7,6 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 #include <learnopengl/filesystem.h>
 #include <learnopengl/shader.h>
@@ -16,9 +15,7 @@
 
 #include <iostream>
 #include <stdexcept>
-#include <string_view>
 #include <vector>
-#include <array>
 
 unsigned load_texture(const std::string& filename)
 {
@@ -74,7 +71,7 @@ public:
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
         // position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)nullptr);
         glEnableVertexAttribArray(0);
         // texture coordinates attribute
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(3 * sizeof(float)));
@@ -87,12 +84,12 @@ public:
     {
         shader.use();
         bind();
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
         unbind();
     }
 
 private:
-    void bind()
+    void bind() const
     {
         glBindTexture(GL_TEXTURE_2D, m_texture);
         glBindVertexArray(m_VAO);
@@ -100,7 +97,7 @@ private:
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
     }
 
-    void unbind()
+    static void unbind()
     {
         glBindTexture(GL_TEXTURE_2D, 0);
         glBindVertexArray(0);
@@ -137,8 +134,8 @@ int main() {
 
     // glfw window creation
     // --------------------
-    GLFWwindow *window = glfwCreateWindow(screen_width, screen_height, "LearnOpenGL", NULL, NULL);
-    if (window == NULL) {
+    GLFWwindow *window = glfwCreateWindow(screen_width, screen_height, "LearnOpenGL", nullptr, nullptr);
+    if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
@@ -213,7 +210,7 @@ int main() {
 
         // input
         // -----
-        process_input(window, state, delta_time);
+        process_input(window, state, static_cast<float>(delta_time));
 
 
         // render
