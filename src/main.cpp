@@ -44,16 +44,17 @@ unsigned load_texture(const std::string& filename)
 
 class Plane {
 public:
-    explicit Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, float texture_size_coeff = 1.0f)
+    explicit Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, float texture_size = 1.0f)
         : m_texture{texture}
     {
-        const float texture_coords = 1.0f / texture_size_coeff;
+        const float tex_coord_x = glm::distance(vertex_pos[0], vertex_pos[1]) / texture_size;
+        const float tex_coord_y = glm::distance(vertex_pos[1], vertex_pos[2]) / texture_size;
         constexpr int vertex_size = 5;
         const float vertices[] {
-                vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, 0.0f,           0.0f,           // bottom left
-                vertex_pos[1].x, vertex_pos[1].y, vertex_pos[1].z, texture_coords, 0.0f,           // bottom right
-                vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, texture_coords, texture_coords, // top right
-                vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, 0.0f,           texture_coords  // top left
+                vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, 0.0f,        0.0f,        // bottom left
+                vertex_pos[1].x, vertex_pos[1].y, vertex_pos[1].z, tex_coord_x, 0.0f,        // bottom right
+                vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, tex_coord_x, tex_coord_y, // top right
+                vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, 0.0f,        tex_coord_y  // top left
         };
         const unsigned indices[] = {
             0, 1, 2, // first triangle
@@ -117,6 +118,28 @@ struct State
     double mouse_pos_y{};
 };
 
+std::vector<Plane> generate_hallway(float width, float height, float length, unsigned floor_texture, unsigned wall_texture, unsigned ceiling_texture)
+{
+    constexpr float texture_size = 3.f;
+    const glm::vec3 bottom_left_front{0.f, 0.f, 0.f};
+    const glm::vec3 bottom_right_front{width, 0.f, 0.f};
+    const glm::vec3 top_right_front{width, height, 0.f};
+    const glm::vec3 top_left_front{0.f, height, 0.f};
+    const glm::vec3 bottom_left_back{0.f, 0.f, length};
+    const glm::vec3 bottom_right_back{width, 0.f, length};
+    const glm::vec3 top_right_back{width, height, length};
+    const glm::vec3 top_left_back{0.f, height, length};
+
+    const Plane floor = Plane({bottom_left_front, bottom_right_front, bottom_right_back, bottom_left_back}, floor_texture, texture_size);
+    const Plane front_wall = Plane({bottom_right_front, bottom_left_front, top_left_front, top_right_front}, wall_texture, texture_size);
+    const Plane left_wall = Plane({bottom_left_front, bottom_left_back, top_left_back, top_left_front}, wall_texture, texture_size);
+    const Plane right_wall = Plane({bottom_right_back, bottom_right_front, top_right_front, top_right_back}, wall_texture, texture_size);
+    const Plane back_wall = Plane({bottom_left_back, bottom_right_back, top_right_back, top_left_back}, wall_texture, texture_size);
+    const Plane ceiling = Plane({top_right_front, top_left_front, top_left_back, top_right_back}, ceiling_texture, texture_size);
+
+    return {floor, front_wall, left_wall, right_wall, back_wall, ceiling};
+}
+
 void process_input(GLFWwindow *window, State& state, float delta_time);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 
@@ -170,6 +193,7 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
+//    glEnable(GL_CULL_FACE);
 
     // build and compile shaders
     // -------------------------
@@ -177,24 +201,15 @@ int main() {
 
     // load models
     // -----------
-    const auto texture = load_texture("container.jpg");
-    std::vector<Plane> planes;
-    constexpr float hallway_length = 10.f / 2.f;
-    constexpr float hallway_height = 5.f / 2.f;
-    constexpr float hallway_width = 5.f / 2.f;
-    planes.emplace_back(
-            std::vector<glm::vec3>{
-                    {-hallway_width, -hallway_height, -hallway_length},
-                    {hallway_width,  -hallway_height, -hallway_length},
-                    {hallway_width,  -hallway_height, hallway_length},
-                    {-hallway_width, -hallway_height, hallway_length},
-            }, texture, 0.7
-    );
+    const auto floor_texture = load_texture("container.jpg");
+    std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor_texture, floor_texture, floor_texture);
 
     // draw in wireframe
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     constexpr glm::vec3 clear_color{0.0f, 0.0f, 0.0f};
+    state.camera.Position += glm::vec3{2.5f, 2.5f, 5.0f};
+
 
     // timing
     double last_frame = glfwGetTime();
