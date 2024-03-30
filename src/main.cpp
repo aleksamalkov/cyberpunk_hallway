@@ -58,8 +58,8 @@ public:
                 vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, normal.x, normal.y, normal.z, 0.0f,        tex_coord_y  // top left
         };
         const unsigned indices[] = {
-            0, 1, 2, // first triangle
-            2, 3, 0  // second triangle
+            0, 2, 1, // first triangle
+            2, 0, 3  // second triangle
         };
 
         // TODO: destruct them later
@@ -96,7 +96,11 @@ public:
 private:
     void bind() const
     {
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_texture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, m_texture);
+
         glBindVertexArray(m_VAO);
         glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
@@ -104,7 +108,11 @@ private:
 
     static void unbind()
     {
+        glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
         glBindVertexArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -213,7 +221,7 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-//    glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
 
     // build and compile shaders
     // -------------------------
@@ -221,6 +229,7 @@ int main() {
 
     // load models
     // -----------
+    Model model(FileSystem::getPath("resources/objects/backpack/backpack.obj"));
     const auto floor_texture = load_texture("container.jpg");
     std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor_texture, floor_texture, floor_texture);
 
@@ -283,6 +292,10 @@ int main() {
         for (auto& plane : planes) {
             plane.draw(shader);
         }
+
+        shader.use();
+        shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(3.f, 3.f, 3.f)));
+        model.Draw(shader);
 
 
         // glfw: swap buffers and poll IO events

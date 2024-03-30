@@ -7,7 +7,9 @@ in VS_OUT {
     vec2 TexCoords;
 } fs_in;
 
-uniform sampler2D texture1;
+uniform sampler2D texture_diffuse1;
+uniform sampler2D texture_specular1;
+
 uniform vec3 viewPos;
 
 struct Light {
@@ -34,13 +36,13 @@ vec3 BlinnPhong(Light light, vec3 normal, vec3 viewDir)
 {
     vec3 lightDir = normalize(light.position - fs_in.FragPos);
 
-    vec3 ambient = light.ambient * vec3(texture(texture1, fs_in.TexCoords));
+    vec3 ambient = light.ambient * vec3(texture(texture_diffuse1, fs_in.TexCoords));
 
-    vec3 diffuse = light.diffuse * max(dot(normal, lightDir), 0.0) * vec3(texture(texture1, fs_in.TexCoords));
+    vec3 diffuse = light.diffuse * max(dot(normal, lightDir), 0.0) * vec3(texture(texture_diffuse1, fs_in.TexCoords));
 
     vec3 halfwayDir = normalize(lightDir + viewDir);
     vec3 specular = light.specular * pow(max(dot(normal, halfwayDir), 0.0), material.shininess)
-            * vec3(texture(texture1, fs_in.TexCoords));
+            * texture(texture_specular1, fs_in.TexCoords).xxx;
 
     float distance = length(light.position - fs_in.FragPos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));
@@ -57,5 +59,5 @@ void main()
         color += BlinnPhong(lights[i], normal, viewDir);
     }
     FragColor = vec4(color, 1.0);
-//     FragColor = vec4(vec3(texture(texture1, fs_in.TexCoords)), 1.0);
+//     FragColor = vec4(vec3(texture(texture_diffuse1, fs_in.TexCoords)), 1.0);
 }
