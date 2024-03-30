@@ -49,12 +49,13 @@ public:
     {
         const float tex_coord_x = glm::distance(vertex_pos[0], vertex_pos[1]) / texture_size;
         const float tex_coord_y = glm::distance(vertex_pos[1], vertex_pos[2]) / texture_size;
-        constexpr int vertex_size = 5;
+        const glm::vec3 normal = glm::cross(vertex_pos[0] - vertex_pos[2], vertex_pos[0] - vertex_pos[1]);
+        constexpr int vertex_size = 3 + 3 + 2;
         const float vertices[] {
-                vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, 0.0f,        0.0f,        // bottom left
-                vertex_pos[1].x, vertex_pos[1].y, vertex_pos[1].z, tex_coord_x, 0.0f,        // bottom right
-                vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, tex_coord_x, tex_coord_y, // top right
-                vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, 0.0f,        tex_coord_y  // top left
+                vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, normal.x, normal.y, normal.z, 0.0f,        0.0f,        // bottom left
+                vertex_pos[1].x, vertex_pos[1].y, vertex_pos[1].z, normal.x, normal.y, normal.z, tex_coord_x, 0.0f,        // bottom right
+                vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, normal.x, normal.y, normal.z, tex_coord_x, tex_coord_y, // top right
+                vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, normal.x, normal.y, normal.z, 0.0f,        tex_coord_y  // top left
         };
         const unsigned indices[] = {
             0, 1, 2, // first triangle
@@ -74,9 +75,12 @@ public:
         // position attribute
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)nullptr);
         glEnableVertexAttribArray(0);
-        // texture coordinates attribute
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(3 * sizeof(float)));
+        // normal attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
+        // texture coordinates attribute
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(6 * sizeof(float)));
+        glEnableVertexAttribArray(2);
 
         unbind();
     }
@@ -116,6 +120,22 @@ struct State
     Camera camera{};
     double mouse_pos_x{};
     double mouse_pos_y{};
+};
+
+struct Light {
+    glm::vec3 position;
+
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+
+    float constant;
+    float linear;
+    float quadratic;
+};
+
+struct Material {
+    float shininess;
 };
 
 std::vector<Plane> generate_hallway(float width, float height, float length, unsigned floor_texture, unsigned wall_texture, unsigned ceiling_texture)
@@ -236,9 +256,29 @@ int main() {
         const auto projection = glm::perspective(glm::radians(45.0f), screen_width / screen_height, 0.1f, 100.0f);
         const auto view = state.camera.GetViewMatrix();
 
+        shader.use();
         shader.setMat4("model", glm::mat4(1.0f));
         shader.setMat4("view", state.camera.GetViewMatrix());
         shader.setMat4("projection", projection);
+        // point light 1
+        shader.setVec3("lights[0].position", glm::vec3{1.f, 1.f, 1.f});
+        shader.setVec3("lights[0].ambient", 0.05f, 0.05f, 0.05f);
+        shader.setVec3("lights[0].diffuse", 0.8f, 0.8f, 0.8f);
+        shader.setVec3("lights[0].specular", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("lights[0].constant", 1.0f);
+        shader.setFloat("lights[0].linear", 0.35f);
+        shader.setFloat("lights[0].quadratic", 0.44f);
+        // point light 2
+        shader.setVec3("lights[1].position", glm::vec3{4.f, 4.f, 6.f});
+        shader.setVec3("lights[1].ambient", 0.05f, 0.05f, 0.05f);
+        shader.setVec3("lights[1].diffuse", 0.8f, 0.8f, 0.8f);
+        shader.setVec3("lights[1].specular", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("lights[1].constant", 1.0f);
+        shader.setFloat("lights[1].linear", 0.35f);
+        shader.setFloat("lights[1].quadratic", 0.44f);
+
+        shader.setFloat("material.shininess", 32);
+        shader.setVec3("viewPos", state.camera.Position);
 
         for (auto& plane : planes) {
             plane.draw(shader);
