@@ -26,6 +26,7 @@ struct Settings
     float linear = 0.35f;
     float quadratic = 0.44f;
     float shininess = 32.0f;
+    float gamma = 2.2f;
 };
 
 unsigned load_texture(const std::string& filename)
@@ -43,8 +44,8 @@ unsigned load_texture(const std::string& filename)
     if (!data) {
         throw std::runtime_error("Can't find texture " + filename);
     }
-    
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
     
     stbi_image_free(data);
@@ -142,22 +143,6 @@ struct State
     bool gui_enabled{};
 };
 
-struct Light {
-    glm::vec3 position;
-
-    glm::vec3 ambient;
-    glm::vec3 diffuse;
-    glm::vec3 specular;
-
-    float constant;
-    float linear;
-    float quadratic;
-};
-
-struct Material {
-    float shininess;
-};
-
 std::vector<Plane> generate_hallway(float width, float height, float length, unsigned floor_texture, unsigned wall_texture, unsigned ceiling_texture)
 {
     constexpr float texture_size = 3.f;
@@ -204,7 +189,7 @@ private:
     double m_last_frame{glfwGetTime()};
 };
 
-void draw_gui(Settings& settings, const State& state, const FPS_counter& fps_counter)
+void draw_gui(Settings& settings, const FPS_counter& fps_counter)
 {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -219,14 +204,15 @@ void draw_gui(Settings& settings, const State& state, const FPS_counter& fps_cou
 
     ImGui::Begin("Settings");
     ImGui::SetWindowPos({10, 50}, ImGuiCond_Once);
-    ImGui::SetWindowSize({470, 200}, ImGuiCond_Once);
+    ImGui::SetWindowSize({470, 220}, ImGuiCond_Once);
     ImGui::ColorEdit3("ambient", reinterpret_cast<float *>(&settings.ambient));
     ImGui::ColorEdit3("diffuse", reinterpret_cast<float *>(&settings.diffuse));
     ImGui::ColorEdit3("specular", reinterpret_cast<float *>(&settings.specular));
-    ImGui::DragFloat("pointLight.constant", &settings.constant, 0.005, 0.0, 1.0);
-    ImGui::DragFloat("pointLight.linear", &settings.linear, 0.005, 0.0, 1.0);
-    ImGui::DragFloat("pointLight.quadratic", &settings.quadratic, 0.005, 0.0, 1.0);
+    ImGui::DragFloat("pointLight.constant", &settings.constant, 0.005, 0.0, 2.0);
+    ImGui::DragFloat("pointLight.linear", &settings.linear, 0.005, 0.0, 2.0);
+    ImGui::DragFloat("pointLight.quadratic", &settings.quadratic, 0.005, 0.0, 2.0);
     ImGui::DragFloat("material.shininess", &settings.shininess, 0.25, 0.0, 1000.0);
+    ImGui::DragFloat("gamma", &settings.gamma, 0.005, 0.0f, 4.0f);
     ImGui::End();
 
     ImGui::Render();
@@ -292,7 +278,7 @@ int main() {
 
     // load models
     // -----------
-    Model model(FileSystem::getPath("resources/objects/backpack/backpack.obj"));
+    Model model(FileSystem::getPath("resources/objects/backpack/backpack.obj"), true);
     const auto floor_texture = load_texture("container.jpg");
     std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor_texture, floor_texture, floor_texture);
 
@@ -350,6 +336,9 @@ int main() {
         shader.setFloat("material.shininess", settings.shininess);
         shader.setVec3("viewPos", state.camera.Position);
 
+        // TODO: set this to post-processing shader instead
+        shader.setFloat("gamma", settings.gamma);
+
         for (auto& plane : planes) {
             plane.draw(shader);
         }
@@ -359,7 +348,7 @@ int main() {
         model.Draw(shader);
 
         if (state.gui_enabled)
-            draw_gui(settings, state, fps_counter);
+            draw_gui(settings, fps_counter);
 
         // glfw: swap buffers and poll IO events
         // -------------------------------------------------------------------------------
@@ -408,7 +397,7 @@ void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos)
     }
 }
 
-void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+void key_callback(GLFWwindow *window, int key, [[maybe_unused]] int scancode, int action, [[maybe_unused]] int mods) {
     auto* state = static_cast<State*>(glfwGetWindowUserPointer(window));
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {

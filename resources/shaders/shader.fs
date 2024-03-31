@@ -10,8 +10,6 @@ in VS_OUT {
 uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_specular1;
 
-uniform vec3 viewPos;
-
 struct Light {
     vec3 position;
 
@@ -31,6 +29,10 @@ struct Material {
 #define NUM_LIGHTS 2
 uniform Light lights[NUM_LIGHTS];
 uniform Material material;
+uniform vec3 viewPos;
+
+// TODO: remove this when post-processing is added
+uniform float gamma;
 
 vec3 BlinnPhong(Light light, vec3 normal, vec3 viewDir)
 {
@@ -59,5 +61,6 @@ void main()
         color += BlinnPhong(lights[i], normal, viewDir);
     }
     FragColor = vec4(color, 1.0);
-//     FragColor = vec4(vec3(texture(texture_diffuse1, fs_in.TexCoords)), 1.0);
+    // TODO: remove this when post-processing is added
+    FragColor.rgb = pow(FragColor.rgb, vec3(1.0/gamma));
 }
