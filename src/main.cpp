@@ -384,11 +384,16 @@ void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos)
 }
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, true);
-    }
-
     auto* state = static_cast<State*>(glfwGetWindowUserPointer(window));
+
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        if (state->gui_enabled) {
+            state->gui_enabled = false;
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        } else {
+            glfwSetWindowShouldClose(window, true);
+        }
+    }
 
     if ((key == GLFW_KEY_F1 || key == GLFW_KEY_Q) && action == GLFW_PRESS) {
         state->gui_enabled = !state->gui_enabled;
