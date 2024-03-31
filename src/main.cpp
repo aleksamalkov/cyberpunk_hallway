@@ -270,17 +270,47 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+//    glEnable(GL_CULL_FACE);
 
     // build and compile shaders
     // -------------------------
     Shader shader("resources/shaders/shader.vs", "resources/shaders/shader.fs");
+    Shader screen_shader("resources/shaders/screen.vs", "resources/shaders/screen.fs");
 
     // load models
     // -----------
     Model model(FileSystem::getPath("resources/objects/backpack/backpack.obj"), true);
     const auto floor_texture = load_texture("container.jpg");
     std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor_texture, floor_texture, floor_texture);
+
+    // framebuffers
+    // ------------
+    unsigned int framebuffer;
+    glGenFramebuffers(1, &framebuffer);
+
+    unsigned int color_buffer;
+    glGenTextures(1, &color_buffer);
+    glBindTexture(GL_TEXTURE_2D, color_buffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    unsigned int depth_buffer;
+    glGenRenderbuffers(1, &depth_buffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, depth_buffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_buffer, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_buffer);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "Error: Framebuffer not complete!" << std::endl;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    Plane screen_plane({{-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}}, color_buffer, 2.0f);
 
     // draw in wireframe
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -304,8 +334,9 @@ int main() {
         process_input(window, state, static_cast<float>(delta_time));
 
 
-        // render
-        // ------
+        // render to framebuffer
+        // ---------------------
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -336,9 +367,6 @@ int main() {
         shader.setFloat("material.shininess", settings.shininess);
         shader.setVec3("viewPos", state.camera.Position);
 
-        // TODO: set this to post-processing shader instead
-        shader.setFloat("gamma", settings.gamma);
-
         for (auto& plane : planes) {
             plane.draw(shader);
         }
@@ -347,8 +375,21 @@ int main() {
         shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(3.f, 3.f, 3.f)));
         model.Draw(shader);
 
-        if (state.gui_enabled)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // post-processing
+        // ---------------
+        glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        screen_shader.use();
+        screen_shader.setFloat("gamma", settings.gamma);
+        screen_plane.draw(screen_shader);
+
+
+        if (state.gui_enabled) {
             draw_gui(settings, fps_counter);
+        }
 
         // glfw: swap buffers and poll IO events
         // -------------------------------------------------------------------------------
