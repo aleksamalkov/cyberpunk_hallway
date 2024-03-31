@@ -27,6 +27,7 @@ struct Settings
     float quadratic = 0.44f;
     float shininess = 32.0f;
     float gamma = 2.2f;
+    float exposure = 1.0;
 };
 
 unsigned load_texture(const std::string& filename)
@@ -204,7 +205,7 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
 
     ImGui::Begin("Settings");
     ImGui::SetWindowPos({10, 50}, ImGuiCond_Once);
-    ImGui::SetWindowSize({470, 220}, ImGuiCond_Once);
+    ImGui::SetWindowSize({470, 250}, ImGuiCond_Once);
     ImGui::ColorEdit3("ambient", reinterpret_cast<float *>(&settings.ambient));
     ImGui::ColorEdit3("diffuse", reinterpret_cast<float *>(&settings.diffuse));
     ImGui::ColorEdit3("specular", reinterpret_cast<float *>(&settings.specular));
@@ -213,6 +214,7 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
     ImGui::DragFloat("pointLight.quadratic", &settings.quadratic, 0.005, 0.0, 2.0);
     ImGui::DragFloat("material.shininess", &settings.shininess, 0.25, 0.0, 1000.0);
     ImGui::DragFloat("gamma", &settings.gamma, 0.005, 0.0f, 4.0f);
+    ImGui::DragFloat("exposure", &settings.exposure, 0.005, 0.0f, 4.0f);
     ImGui::End();
 
     ImGui::Render();
@@ -384,6 +386,7 @@ int main() {
 
         screen_shader.use();
         screen_shader.setFloat("gamma", settings.gamma);
+        screen_shader.setFloat("exposure", settings.exposure);
         screen_plane.draw(screen_shader);
 
 
