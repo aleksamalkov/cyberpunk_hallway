@@ -61,7 +61,7 @@ public:
     {
         const float tex_coord_x = glm::distance(vertex_pos[0], vertex_pos[1]) / texture_size;
         const float tex_coord_y = glm::distance(vertex_pos[1], vertex_pos[2]) / texture_size;
-        const glm::vec3 normal = glm::cross(vertex_pos[0] - vertex_pos[2], vertex_pos[0] - vertex_pos[1]);
+        const glm::vec3 normal = glm::cross(vertex_pos[0] - vertex_pos[1], vertex_pos[0] - vertex_pos[2]);
         constexpr int vertex_size = 3 + 3 + 2;
         const float vertices[] {
                 vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, normal.x, normal.y, normal.z, 0.0f,        0.0f,        // bottom left
@@ -70,8 +70,8 @@ public:
                 vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, normal.x, normal.y, normal.z, 0.0f,        tex_coord_y  // top left
         };
         const unsigned indices[] = {
-            0, 2, 1, // first triangle
-            2, 0, 3  // second triangle
+            0, 1, 2, // first triangle
+            2, 3, 0  // second triangle
         };
 
         // TODO: destruct them later
@@ -150,10 +150,10 @@ std::vector<Plane> generate_hallway(float width, float height, float length, uns
     const glm::vec3 bottom_right_front{width, 0.f, 0.f};
     const glm::vec3 top_right_front{width, height, 0.f};
     const glm::vec3 top_left_front{0.f, height, 0.f};
-    const glm::vec3 bottom_left_back{0.f, 0.f, length};
-    const glm::vec3 bottom_right_back{width, 0.f, length};
-    const glm::vec3 top_right_back{width, height, length};
-    const glm::vec3 top_left_back{0.f, height, length};
+    const glm::vec3 bottom_left_back{0.f, 0.f, -length};
+    const glm::vec3 bottom_right_back{width, 0.f, -length};
+    const glm::vec3 top_right_back{width, height, -length};
+    const glm::vec3 top_left_back{0.f, height, -length};
 
     const Plane floor = Plane({bottom_left_front, bottom_right_front, bottom_right_back, bottom_left_back}, floor_texture, texture_size);
     const Plane front_wall = Plane({bottom_right_front, bottom_left_front, top_left_front, top_right_front}, wall_texture, texture_size);
@@ -270,7 +270,7 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-//    glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
 
     // build and compile shaders
     // -------------------------
@@ -316,7 +316,7 @@ int main() {
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     constexpr glm::vec3 clear_color{0.0f, 0.0f, 0.0f};
-    state.camera.Position += glm::vec3{2.5f, 2.5f, 5.0f};
+    state.camera.Position += glm::vec3{2.5f, 2.5f, -5.0f};
 
 
     // timing
@@ -348,7 +348,7 @@ int main() {
         shader.setMat4("view", state.camera.GetViewMatrix());
         shader.setMat4("projection", projection);
         // point light 1
-        shader.setVec3("lights[0].position", glm::vec3{1.f, 1.f, 1.f});
+        shader.setVec3("lights[0].position", glm::vec3{4.f, 1.f, -1.f});
         shader.setVec3("lights[0].ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
         shader.setVec3("lights[0].diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
         shader.setVec3("lights[0].specular", settings.specular.r, settings.specular.g, settings.specular.b);
@@ -356,7 +356,7 @@ int main() {
         shader.setFloat("lights[0].linear", settings.linear);
         shader.setFloat("lights[0].quadratic", settings.quadratic);
         // point light 2
-        shader.setVec3("lights[1].position", glm::vec3{4.f, 4.f, 6.f});
+        shader.setVec3("lights[1].position", glm::vec3{1.f, 4.f, -6.f});
         shader.setVec3("lights[1].ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
         shader.setVec3("lights[1].diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
         shader.setVec3("lights[1].specular", settings.specular.r, settings.specular.g, settings.specular.b);
@@ -372,7 +372,7 @@ int main() {
         }
 
         shader.use();
-        shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(3.f, 3.f, 3.f)));
+        shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(2.f, 2.f, -6.f)));
         model.Draw(shader);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -444,7 +444,7 @@ void key_callback(GLFWwindow *window, int key, [[maybe_unused]] int scancode, in
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         if (state->gui_enabled) {
             state->gui_enabled = false;
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         } else {
             glfwSetWindowShouldClose(window, true);
         }
