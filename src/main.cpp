@@ -25,6 +25,7 @@ struct Settings
     float constant = 1.0f;
     float linear = 0.35f;
     float quadratic = 0.44f;
+    float shininess = 32.0f;
 };
 
 unsigned load_texture(const std::string& filename)
@@ -187,19 +188,45 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 constexpr float screen_width = 800.0f;
 constexpr float screen_height = 600.0f;
 
-void draw_gui(Settings& settings, const State& state)
+class FPS_counter
+{
+public:
+    double next_frame()
+    {
+        const double current_frame = glfwGetTime();
+        const double delta = current_frame - m_last_frame;
+        frame_rate = 1.0 / delta;
+        m_last_frame = current_frame;
+        return delta;
+    }
+    double frame_rate{};
+private:
+    double m_last_frame{glfwGetTime()};
+};
+
+void draw_gui(Settings& settings, const State& state, const FPS_counter& fps_counter)
 {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    ImGui::Begin("FPS");
+    ImGui::SetWindowCollapsed(true, ImGuiCond_Once);
+    ImGui::SetWindowPos({10, 10}, ImGuiCond_Once);
+    ImGui::SetWindowSize({100, 50}, ImGuiCond_Once);
+    ImGui::Text(std::to_string(fps_counter.frame_rate).c_str());
+    ImGui::End();
+
     ImGui::Begin("Settings");
+    ImGui::SetWindowPos({10, 50}, ImGuiCond_Once);
+    ImGui::SetWindowSize({470, 200}, ImGuiCond_Once);
     ImGui::ColorEdit3("ambient", reinterpret_cast<float *>(&settings.ambient));
     ImGui::ColorEdit3("diffuse", reinterpret_cast<float *>(&settings.diffuse));
     ImGui::ColorEdit3("specular", reinterpret_cast<float *>(&settings.specular));
-    ImGui::DragFloat("pointLight.constant", &settings.constant, 0.01, 0.0, 1.0);
-    ImGui::DragFloat("pointLight.linear", &settings.linear, 0.01, 0.0, 1.0);
-    ImGui::DragFloat("pointLight.quadratic", &settings.quadratic, 0.01, 0.0, 1.0);
+    ImGui::DragFloat("pointLight.constant", &settings.constant, 0.005, 0.0, 1.0);
+    ImGui::DragFloat("pointLight.linear", &settings.linear, 0.005, 0.0, 1.0);
+    ImGui::DragFloat("pointLight.quadratic", &settings.quadratic, 0.005, 0.0, 1.0);
+    ImGui::DragFloat("material.shininess", &settings.shininess, 0.25, 0.0, 1000.0);
     ImGui::End();
 
     ImGui::Render();
@@ -277,16 +304,14 @@ int main() {
 
 
     // timing
-    double last_frame = glfwGetTime();
+    FPS_counter fps_counter;
 
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window)) {
         // per-frame time logic
         // --------------------
-        const double current_frame = glfwGetTime();
-        const double delta_time = current_frame - last_frame;
-        last_frame = current_frame;
+        const double delta_time = fps_counter.next_frame();
 
         // input
         // -----
@@ -322,7 +347,7 @@ int main() {
         shader.setFloat("lights[1].linear", settings.linear);
         shader.setFloat("lights[1].quadratic", settings.quadratic);
 
-        shader.setFloat("material.shininess", 32);
+        shader.setFloat("material.shininess", settings.shininess);
         shader.setVec3("viewPos", state.camera.Position);
 
         for (auto& plane : planes) {
@@ -334,7 +359,7 @@ int main() {
         model.Draw(shader);
 
         if (state.gui_enabled)
-            draw_gui(settings, state);
+            draw_gui(settings, state, fps_counter);
 
         // glfw: swap buffers and poll IO events
         // -------------------------------------------------------------------------------
