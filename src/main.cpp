@@ -57,33 +57,104 @@ unsigned load_texture(const std::string& filename)
 
 class Plane {
 public:
-    explicit Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, float texture_size = 1.0f)
+    Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, float texture_size)
         : m_texture{texture}
+    {
+        init(vertex_pos, texture_size);
+    }
+
+    Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, unsigned tex_normal, float texture_size)
+        : m_texture{texture}, m_tex_normal{tex_normal}
+    {
+        init(vertex_pos, texture_size);
+    }
+
+    Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, unsigned tex_normal, unsigned tex_specular, float texture_size)
+        : m_texture{texture}, m_tex_normal{tex_normal}, m_tex_specular{tex_specular}
+    {
+        init(vertex_pos, texture_size);
+    }
+
+    void draw(Shader shader)
+    {
+        shader.use();
+        bind();
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        unbind();
+    }
+
+private:
+    void init(const std::vector<glm::vec3>& vertex_pos, float texture_size)
     {
         const float tex_coord_x = glm::distance(vertex_pos[0], vertex_pos[1]) / texture_size;
         const float tex_coord_y = glm::distance(vertex_pos[1], vertex_pos[2]) / texture_size;
-        const glm::vec3 normal = glm::cross(vertex_pos[0] - vertex_pos[1], vertex_pos[0] - vertex_pos[2]);
-        constexpr int vertex_size = 3 + 3 + 2;
-        const float vertices[] {
-                vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, normal.x, normal.y, normal.z, 0.0f,        0.0f,        // bottom left
-                vertex_pos[1].x, vertex_pos[1].y, vertex_pos[1].z, normal.x, normal.y, normal.z, tex_coord_x, 0.0f,        // bottom right
-                vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, normal.x, normal.y, normal.z, tex_coord_x, tex_coord_y, // top right
-                vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, normal.x, normal.y, normal.z, 0.0f,        tex_coord_y  // top left
-        };
-        const unsigned indices[] = {
-            0, 1, 2, // first triangle
-            2, 3, 0  // second triangle
-        };
+        const glm::vec3 normal = glm::normalize(glm::cross(vertex_pos[0] - vertex_pos[1], vertex_pos[0] - vertex_pos[2]));
 
+        const std::vector<glm::vec2> tex_pos {{0.0f, 0.0f}, {tex_coord_x, 0}, {tex_coord_x, tex_coord_y}, {0.0f, tex_coord_y}};
+
+        // first triangle
+        glm::vec3 tangent1{};
+        glm::vec3 bitangent1{};
+        {
+            glm::vec3 edge2 = vertex_pos[1] - vertex_pos[0];
+            glm::vec3 edge1 = vertex_pos[2] - vertex_pos[0];
+            glm::vec2 deltaUV1 = tex_pos[1] - tex_pos[0];
+            glm::vec2 deltaUV2 = tex_pos[2] - tex_pos[0];
+
+            float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+            tangent1.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+            tangent1.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+            tangent1.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+            bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+            bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+            bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+        }
+        // second triangle
+        glm::vec3 tangent2{};
+        glm::vec3 bitangent2{};
+        {
+            glm::vec3 edge2 = vertex_pos[3] - vertex_pos[2];
+            glm::vec3 edge1 = vertex_pos[0] - vertex_pos[2];
+            glm::vec2 deltaUV1 = tex_pos[3] - tex_pos[2];
+            glm::vec2 deltaUV2 = tex_pos[0] - tex_pos[2];
+
+            float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+            tangent2.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+            tangent2.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+            tangent2.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+            bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+            bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+            bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+        }
+
+        constexpr int vertex_size = 3 + 3 + 2 + 3 + 3;
+        const float vertices[] {
+                // first triangle
+                vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, normal.x, normal.y, normal.z, tex_pos[0].x, tex_pos[0].y, // bottom left
+                tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                vertex_pos[1].x, vertex_pos[1].y, vertex_pos[1].z, normal.x, normal.y, normal.z, tex_pos[1].x, tex_pos[1].y, // bottom right
+                tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, normal.x, normal.y, normal.z, tex_pos[2].x, tex_pos[2].y, // top right
+                tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                // second triangle
+                vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, normal.x, normal.y, normal.z, tex_pos[2].x, tex_pos[2].y, // top right
+                tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, normal.x, normal.y, normal.z, tex_pos[3].x, tex_pos[3].y, // top left
+                tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, normal.x, normal.y, normal.z, tex_pos[0].x, tex_pos[0].y, // bottom left
+                tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z
+        };
         // TODO: destruct them later
         glGenVertexArrays(1, &m_VAO);
         glGenBuffers(1, &m_VBO);
-        glGenBuffers(1, &m_EBO);
 
         bind();
 
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
         // position attribute
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)nullptr);
@@ -94,33 +165,41 @@ public:
         // texture coordinates attribute
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(6 * sizeof(float)));
         glEnableVertexAttribArray(2);
+        // tangent attribute
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(8 * sizeof(float)));
+        glEnableVertexAttribArray(3);
+        // bitangent attribute
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(11 * sizeof(float)));
+        glEnableVertexAttribArray(4);
 
         unbind();
     }
 
-    void draw(Shader shader)
-    {
-        shader.use();
-        bind();
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
-        unbind();
-    }
-
-private:
     void bind() const
     {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_texture);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_texture);
+        if (m_tex_specular) {
+            glBindTexture(GL_TEXTURE_2D, m_tex_specular);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, m_texture);
+        }
+        glActiveTexture(GL_TEXTURE2);
+        if (m_tex_normal) {
+            glBindTexture(GL_TEXTURE_2D, m_tex_normal);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
 
         glBindVertexArray(m_VAO);
         glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
     }
 
     static void unbind()
     {
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, 0);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, 0);
         glActiveTexture(GL_TEXTURE0);
@@ -128,12 +207,12 @@ private:
 
         glBindVertexArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
     unsigned m_texture{};
+    unsigned m_tex_normal{};
+    unsigned m_tex_specular{};
     unsigned m_VBO{};
     unsigned m_VAO{};
-    unsigned m_EBO{};
 };
 
 struct State
@@ -144,8 +223,12 @@ struct State
     bool gui_enabled{};
 };
 
-std::vector<Plane> generate_hallway(float width, float height, float length, unsigned floor_texture, unsigned wall_texture, unsigned ceiling_texture)
+std::vector<Plane> generate_hallway(float width, float height, float length, unsigned texture, unsigned tex_normal)
 {
+    unsigned floor_texture = texture;
+    unsigned wall_texture = texture;
+    unsigned ceiling_texture = texture;
+
     constexpr float texture_size = 3.f;
     const glm::vec3 bottom_left_front{0.f, 0.f, 0.f};
     const glm::vec3 bottom_right_front{width, 0.f, 0.f};
@@ -156,12 +239,12 @@ std::vector<Plane> generate_hallway(float width, float height, float length, uns
     const glm::vec3 top_right_back{width, height, -length};
     const glm::vec3 top_left_back{0.f, height, -length};
 
-    const Plane floor = Plane({bottom_left_front, bottom_right_front, bottom_right_back, bottom_left_back}, floor_texture, texture_size);
-    const Plane front_wall = Plane({bottom_right_front, bottom_left_front, top_left_front, top_right_front}, wall_texture, texture_size);
-    const Plane left_wall = Plane({bottom_left_front, bottom_left_back, top_left_back, top_left_front}, wall_texture, texture_size);
-    const Plane right_wall = Plane({bottom_right_back, bottom_right_front, top_right_front, top_right_back}, wall_texture, texture_size);
-    const Plane back_wall = Plane({bottom_left_back, bottom_right_back, top_right_back, top_left_back}, wall_texture, texture_size);
-    const Plane ceiling = Plane({top_right_front, top_left_front, top_left_back, top_right_back}, ceiling_texture, texture_size);
+    const Plane floor = Plane({bottom_left_front, bottom_right_front, bottom_right_back, bottom_left_back}, floor_texture, tex_normal, texture_size);
+    const Plane front_wall = Plane({bottom_right_front, bottom_left_front, top_left_front, top_right_front}, wall_texture, tex_normal, texture_size);
+    const Plane left_wall = Plane({bottom_left_front, bottom_left_back, top_left_back, top_left_front}, wall_texture, tex_normal, texture_size);
+    const Plane right_wall = Plane({bottom_right_back, bottom_right_front, top_right_front, top_right_back}, wall_texture, tex_normal, texture_size);
+    const Plane back_wall = Plane({bottom_left_back, bottom_right_back, top_right_back, top_left_back}, wall_texture, tex_normal, texture_size);
+    const Plane ceiling = Plane({top_right_front, top_left_front, top_left_back, top_right_back}, ceiling_texture, tex_normal, texture_size);
 
     return {floor, front_wall, left_wall, right_wall, back_wall, ceiling};
 }
@@ -282,8 +365,9 @@ int main() {
     // load models
     // -----------
     Model model(FileSystem::getPath("resources/objects/backpack/backpack.obj"), true);
-    const auto floor_texture = load_texture("container.jpg");
-    std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor_texture, floor_texture, floor_texture);
+    const auto floor_texture = load_texture("brickwall.jpg");
+    const auto floor_normal_texture = load_texture("brickwall_normal.jpg");
+    std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor_texture, floor_normal_texture);
 
     // framebuffers
     // ------------
