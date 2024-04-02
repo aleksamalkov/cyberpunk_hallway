@@ -30,7 +30,7 @@ struct Settings
     float exposure = 1.0;
 };
 
-unsigned load_texture(const std::string& filename)
+unsigned load_texture(const std::string& filename, bool gamma_correction = false)
 {
     unsigned texture{};
     glGenTextures(1, &texture);
@@ -46,7 +46,11 @@ unsigned load_texture(const std::string& filename)
         throw std::runtime_error("Can't find texture " + filename);
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    if (gamma_correction) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    } else {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    }
     glGenerateMipmap(GL_TEXTURE_2D);
     
     stbi_image_free(data);
@@ -92,61 +96,34 @@ private:
 
         const std::vector<glm::vec2> tex_pos {{0.0f, 0.0f}, {tex_coord_x, 0}, {tex_coord_x, tex_coord_y}, {0.0f, tex_coord_y}};
 
-        // first triangle
-        glm::vec3 tangent1{};
-        glm::vec3 bitangent1{};
+        glm::vec3 tangent{};
         {
-            glm::vec3 edge2 = vertex_pos[1] - vertex_pos[0];
-            glm::vec3 edge1 = vertex_pos[2] - vertex_pos[0];
-            glm::vec2 deltaUV1 = tex_pos[1] - tex_pos[0];
-            glm::vec2 deltaUV2 = tex_pos[2] - tex_pos[0];
-
+            glm::vec3 edge1 = vertex_pos[2] - vertex_pos[1];
+            glm::vec3 edge2 = vertex_pos[3] - vertex_pos[1];
+            glm::vec2 deltaUV1 = tex_pos[2] - tex_pos[1];
+            glm::vec2 deltaUV2 = tex_pos[3] - tex_pos[1];
             float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
-
-            tangent1.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-            tangent1.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-            tangent1.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-
-            bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-            bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
-            bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-        }
-        // second triangle
-        glm::vec3 tangent2{};
-        glm::vec3 bitangent2{};
-        {
-            glm::vec3 edge2 = vertex_pos[3] - vertex_pos[2];
-            glm::vec3 edge1 = vertex_pos[0] - vertex_pos[2];
-            glm::vec2 deltaUV1 = tex_pos[3] - tex_pos[2];
-            glm::vec2 deltaUV2 = tex_pos[0] - tex_pos[2];
-
-            float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
-
-            tangent2.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-            tangent2.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-            tangent2.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-
-            bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-            bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
-            bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+            tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+            tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+            tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
         }
 
-        constexpr int vertex_size = 3 + 3 + 2 + 3 + 3;
+        constexpr int vertex_size = 3 + 3 + 2 + 3;
         const float vertices[] {
                 // first triangle
                 vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, normal.x, normal.y, normal.z, tex_pos[0].x, tex_pos[0].y, // bottom left
-                tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                tangent.x, tangent.y, tangent.z,
                 vertex_pos[1].x, vertex_pos[1].y, vertex_pos[1].z, normal.x, normal.y, normal.z, tex_pos[1].x, tex_pos[1].y, // bottom right
-                tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                tangent.x, tangent.y, tangent.z,
                 vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, normal.x, normal.y, normal.z, tex_pos[2].x, tex_pos[2].y, // top right
-                tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                tangent.x, tangent.y, tangent.z,
                 // second triangle
                 vertex_pos[2].x, vertex_pos[2].y, vertex_pos[2].z, normal.x, normal.y, normal.z, tex_pos[2].x, tex_pos[2].y, // top right
-                tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                tangent.x, tangent.y, tangent.z,
                 vertex_pos[3].x, vertex_pos[3].y, vertex_pos[3].z, normal.x, normal.y, normal.z, tex_pos[3].x, tex_pos[3].y, // top left
-                tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                tangent.x, tangent.y, tangent.z,
                 vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, normal.x, normal.y, normal.z, tex_pos[0].x, tex_pos[0].y, // bottom left
-                tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z
+                tangent.x, tangent.y, tangent.z
         };
         // TODO: destruct them later
         glGenVertexArrays(1, &m_VAO);
@@ -168,9 +145,6 @@ private:
         // tangent attribute
         glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(8 * sizeof(float)));
         glEnableVertexAttribArray(3);
-        // bitangent attribute
-        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(11 * sizeof(float)));
-        glEnableVertexAttribArray(4);
 
         unbind();
     }
@@ -365,7 +339,7 @@ int main() {
     // load models
     // -----------
     Model model(FileSystem::getPath("resources/objects/backpack/backpack.obj"), true);
-    const auto floor_texture = load_texture("brickwall.jpg");
+    const auto floor_texture = load_texture("brickwall.jpg", true);
     const auto floor_normal_texture = load_texture("brickwall_normal.jpg");
     std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor_texture, floor_normal_texture);
 
