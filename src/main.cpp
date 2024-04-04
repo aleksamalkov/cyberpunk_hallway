@@ -195,6 +195,8 @@ struct State
     double mouse_pos_x{};
     double mouse_pos_y{};
     bool gui_enabled{};
+    float window_width{800.0f};
+    float window_height{600.0f};
 };
 
 std::vector<Plane> generate_hallway(float width, float height, float length, unsigned texture, unsigned tex_normal)
@@ -222,14 +224,6 @@ std::vector<Plane> generate_hallway(float width, float height, float length, uns
 
     return {floor, front_wall, left_wall, right_wall, back_wall, ceiling};
 }
-
-void process_input(GLFWwindow *window, State& state, float delta_time);
-void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos);
-void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
-
-// screen dimensions
-constexpr float screen_width = 800.0f;
-constexpr float screen_height = 600.0f;
 
 class FPS_counter
 {
@@ -279,6 +273,80 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
+class Framebuffer
+{
+public:
+    Framebuffer(float width, float height)
+        : m_width(width), m_height(height)
+    {
+        glGenFramebuffers(1, &m_framebuffer);
+
+        glGenTextures(1, &m_color_buffer);
+        glBindTexture(GL_TEXTURE_2D, m_color_buffer);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glGenRenderbuffers(1, &m_depth_buffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, m_depth_buffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_color_buffer, 0);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depth_buffer);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "Error: Framebuffer not complete!" << std::endl;
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+    
+    void bind() const
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
+    }
+
+    void unbind() const
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    unsigned int color_buffer() const
+    {
+        return m_color_buffer;
+    }
+
+    void update_size(float width, float height)
+    {
+        if (width != m_width || height != m_height) {
+            resize(width, height);
+        }
+    }
+
+private:
+    void resize(float width, float height) const
+    {
+        glBindTexture(GL_TEXTURE_2D, m_color_buffer);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindRenderbuffer(GL_RENDERBUFFER, m_depth_buffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    }
+
+    float m_width;
+    float m_height;
+    unsigned int m_framebuffer;
+    unsigned int m_color_buffer;
+    unsigned int m_depth_buffer;
+};
+
+void process_input(GLFWwindow *window, State& state, float delta_time);
+void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos);
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+
 int main() {
     Settings settings;
     State state;
@@ -292,7 +360,7 @@ int main() {
 
     // glfw window creation
     // --------------------
-    GLFWwindow *window = glfwCreateWindow(screen_width, screen_height, "LearnOpenGL", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(state.window_width, state.window_height, "LearnOpenGL", nullptr, nullptr);
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -306,6 +374,7 @@ int main() {
     glfwSetWindowUserPointer(window, &state);
     glfwSetCursorPosCallback(window, cursor_pos_callback);
     glfwSetKeyCallback(window, key_callback);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -313,6 +382,8 @@ int main() {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
+
+
 
     // tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
     stbi_set_flip_vertically_on_load(true);
@@ -344,34 +415,9 @@ int main() {
     const auto floor_normal_texture = load_texture("brickwall_normal.jpg");
     std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor_texture, floor_normal_texture);
 
-    // framebuffers
-    // ------------
-    unsigned int framebuffer;
-    glGenFramebuffers(1, &framebuffer);
+    Framebuffer hdr_buffer{state.window_width, state.window_height};
 
-    unsigned int color_buffer;
-    glGenTextures(1, &color_buffer);
-    glBindTexture(GL_TEXTURE_2D, color_buffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    unsigned int depth_buffer;
-    glGenRenderbuffers(1, &depth_buffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, depth_buffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_buffer, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_buffer);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "Error: Framebuffer not complete!" << std::endl;
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    Plane screen_plane({{-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}}, color_buffer, 2.0f);
+    Plane screen_plane({{-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}}, hdr_buffer.color_buffer(), 2.0f);
 
     // draw in wireframe
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -393,15 +439,16 @@ int main() {
         // input
         // -----
         process_input(window, state, static_cast<float>(delta_time));
+        hdr_buffer.update_size(state.window_width, state.window_height);
 
 
         // render to framebuffer
         // ---------------------
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        hdr_buffer.bind();
         glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        const auto projection = glm::perspective(glm::radians(45.0f), screen_width / screen_height, 0.1f, 100.0f);
+        const auto projection = glm::perspective(glm::radians(45.0f), state.window_width / state.window_height, 0.1f, 100.0f);
 
         shader.use();
         shader.setMat4("model", glm::mat4(1.0f));
@@ -435,7 +482,7 @@ int main() {
         shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(2.f, 2.f, -6.f)));
         model.Draw(shader);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        hdr_buffer.unbind();
 
         // post-processing
         // ---------------
@@ -519,4 +566,12 @@ void key_callback(GLFWwindow *window, int key, [[maybe_unused]] int scancode, in
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
     }
+}
+
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    auto* state = static_cast<State*>(glfwGetWindowUserPointer(window));
+    state->window_width = width;
+    state->window_height = height;
+    glViewport(0, 0, width, height);
 }
