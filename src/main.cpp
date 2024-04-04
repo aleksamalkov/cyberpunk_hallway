@@ -257,12 +257,13 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
     ImGui::SetWindowCollapsed(true, ImGuiCond_Once);
     ImGui::SetWindowPos({10, 10}, ImGuiCond_Once);
     ImGui::SetWindowSize({100, 50}, ImGuiCond_Once);
-    ImGui::Text(std::to_string(fps_counter.frame_rate).c_str());
+    ImGui::Text("%s", std::to_string(fps_counter.frame_rate).c_str());
     ImGui::End();
 
     ImGui::Begin("Settings");
     ImGui::SetWindowPos({10, 50}, ImGuiCond_Once);
     ImGui::SetWindowSize({470, 250}, ImGuiCond_Once);
+    ImGui::SetWindowCollapsed(false, ImGuiCond_Once);
     ImGui::ColorEdit3("ambient", reinterpret_cast<float *>(&settings.ambient));
     ImGui::ColorEdit3("diffuse", reinterpret_cast<float *>(&settings.diffuse));
     ImGui::ColorEdit3("specular", reinterpret_cast<float *>(&settings.specular));
@@ -401,7 +402,6 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         const auto projection = glm::perspective(glm::radians(45.0f), screen_width / screen_height, 0.1f, 100.0f);
-        const auto view = state.camera.GetViewMatrix();
 
         shader.use();
         shader.setMat4("model", glm::mat4(1.0f));
