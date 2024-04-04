@@ -52,7 +52,7 @@ unsigned load_texture(const std::string& filename, bool gamma_correction = false
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
     }
     glGenerateMipmap(GL_TEXTURE_2D);
-    
+
     stbi_image_free(data);
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -79,7 +79,7 @@ public:
         init(vertex_pos, texture_size);
     }
 
-    void draw(Shader shader)
+    void draw(Shader shader) const
     {
         shader.use();
         bind();
@@ -301,13 +301,13 @@ public:
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
-    
+
     void bind() const
     {
         glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
     }
 
-    void unbind() const
+    static void unbind()
     {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
@@ -321,11 +321,13 @@ public:
     {
         if (width != m_width || height != m_height) {
             resize(width, height);
+            m_width = width;
+            m_height = height;
         }
     }
 
 private:
-    void resize(float width, float height) const
+    void resize(float width, float height)
     {
         glBindTexture(GL_TEXTURE_2D, m_color_buffer);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
@@ -425,8 +427,6 @@ int main() {
     constexpr glm::vec3 clear_color{0.0f, 0.0f, 0.0f};
     state.camera.Position += glm::vec3{2.5f, 2.5f, -5.0f};
 
-
-    // timing
     FPS_counter fps_counter;
 
     // render loop

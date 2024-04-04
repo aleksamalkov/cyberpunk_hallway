@@ -13,7 +13,6 @@ uniform float gamma;
 void main()
 {
     vec3 color = vec3(texture(texture1, fs_in.TexCoords));
-//     vec3 mapped = vec3(1.0) - exp(-color * exposure);
-    vec3 mapped = color;
+    vec3 mapped = vec3(1.0) - exp(-color * exposure);
     FragColor = vec4(pow(mapped, vec3(1.0/gamma)), 1.0);
 }
