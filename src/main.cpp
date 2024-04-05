@@ -28,6 +28,7 @@ struct Settings
     float shininess = 32.0f;
     float gamma = 2.2f;
     float exposure = 1.0;
+    float height = 0.005;
 };
 
 unsigned load_texture(const std::string& filename, bool gamma_correction = false)
@@ -46,10 +47,15 @@ unsigned load_texture(const std::string& filename, bool gamma_correction = false
         throw std::runtime_error("Can't find texture " + filename);
     }
 
-    if (gamma_correction) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    if (channels == 1) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, data);
+    } else  if (channels == 3) {
+        if (gamma_correction)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        else
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
     } else {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        throw std::runtime_error("Texture has " + std::to_string(channels) + " channels");
     }
     glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -59,30 +65,72 @@ unsigned load_texture(const std::string& filename, bool gamma_correction = false
     return texture;
 }
 
+class TextureGroup {
+public:
+    explicit TextureGroup(unsigned diffuse, unsigned normal = 0, unsigned specular = 0, unsigned height = 0)
+        : m_diffuse{diffuse}, m_normal{normal}, m_specular{specular}, m_height{height}
+    {
+    }
+
+    void bind(Shader& shader) const
+    {
+        glActiveTexture(GL_TEXTURE0);
+        glUniform1i(glGetUniformLocation(shader.ID, "texture_diffuse1"), 0);
+        glBindTexture(GL_TEXTURE_2D, m_diffuse);
+        glActiveTexture(GL_TEXTURE1);
+        if (m_specular) {
+            glUniform1i(glGetUniformLocation(shader.ID, "texture_specular1"), 1);
+            glBindTexture(GL_TEXTURE_2D, m_specular);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, m_diffuse);
+        }
+        glActiveTexture(GL_TEXTURE2);
+        if (m_normal) {
+            glUniform1i(glGetUniformLocation(shader.ID, "texture_normal1"), 2);
+            glBindTexture(GL_TEXTURE_2D, m_normal);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+        glActiveTexture(GL_TEXTURE3);
+        if (m_height) {
+            glUniform1i(glGetUniformLocation(shader.ID, "texture_height1"), 3);
+            glBindTexture(GL_TEXTURE_2D, m_height);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+    }
+
+    static void unbind()
+    {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+private:
+    unsigned m_diffuse;
+    unsigned m_normal;
+    unsigned m_specular;
+    unsigned m_height;
+};
+
 class Plane {
 public:
-    Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, float texture_size)
-        : m_texture{texture}
+    Plane(const std::vector<glm::vec3>& vertex_pos, TextureGroup textures, float texture_size)
+        : m_textures{textures}
     {
         init(vertex_pos, texture_size);
     }
 
-    Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, unsigned tex_normal, float texture_size)
-        : m_texture{texture}, m_tex_normal{tex_normal}
-    {
-        init(vertex_pos, texture_size);
-    }
-
-    Plane(const std::vector<glm::vec3>& vertex_pos, unsigned texture, unsigned tex_normal, unsigned tex_specular, float texture_size)
-        : m_texture{texture}, m_tex_normal{tex_normal}, m_tex_specular{tex_specular}
-    {
-        init(vertex_pos, texture_size);
-    }
-
-    void draw(Shader shader) const
+    void draw(Shader& shader) const
     {
         shader.use();
-        bind();
+        bind(shader);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         unbind();
     }
@@ -129,7 +177,8 @@ private:
         glGenVertexArrays(1, &m_VAO);
         glGenBuffers(1, &m_VBO);
 
-        bind();
+        glBindVertexArray(m_VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
 
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
@@ -146,45 +195,25 @@ private:
         glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, vertex_size * sizeof(float), (void*)(8 * sizeof(float)));
         glEnableVertexAttribArray(3);
 
-        unbind();
+        glBindVertexArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    void bind() const
+    void bind(Shader& shader) const
     {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_texture);
-        glActiveTexture(GL_TEXTURE1);
-        if (m_tex_specular) {
-            glBindTexture(GL_TEXTURE_2D, m_tex_specular);
-        } else {
-            glBindTexture(GL_TEXTURE_2D, m_texture);
-        }
-        glActiveTexture(GL_TEXTURE2);
-        if (m_tex_normal) {
-            glBindTexture(GL_TEXTURE_2D, m_tex_normal);
-        } else {
-            glBindTexture(GL_TEXTURE_2D, 0);
-        }
-
+        m_textures.bind(shader);
         glBindVertexArray(m_VAO);
         glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
     }
 
     static void unbind()
     {
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
+        TextureGroup::unbind();
         glBindVertexArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
-    unsigned m_texture{};
-    unsigned m_tex_normal{};
-    unsigned m_tex_specular{};
+
+    TextureGroup m_textures;
     unsigned m_VBO{};
     unsigned m_VAO{};
 };
@@ -199,12 +228,8 @@ struct State
     float window_height{600.0f};
 };
 
-std::vector<Plane> generate_hallway(float width, float height, float length, unsigned texture, unsigned tex_normal)
+std::vector<Plane> generate_hallway(float width, float height, float length, TextureGroup floor_tex, TextureGroup wall_tex, TextureGroup ceiling_tex)
 {
-    unsigned floor_texture = texture;
-    unsigned wall_texture = texture;
-    unsigned ceiling_texture = texture;
-
     constexpr float texture_size = 3.f;
     const glm::vec3 bottom_left_front{0.f, 0.f, 0.f};
     const glm::vec3 bottom_right_front{width, 0.f, 0.f};
@@ -215,12 +240,13 @@ std::vector<Plane> generate_hallway(float width, float height, float length, uns
     const glm::vec3 top_right_back{width, height, -length};
     const glm::vec3 top_left_back{0.f, height, -length};
 
-    const Plane floor = Plane({bottom_left_front, bottom_right_front, bottom_right_back, bottom_left_back}, floor_texture, tex_normal, texture_size);
-    const Plane front_wall = Plane({bottom_right_front, bottom_left_front, top_left_front, top_right_front}, wall_texture, tex_normal, texture_size);
-    const Plane left_wall = Plane({bottom_left_front, bottom_left_back, top_left_back, top_left_front}, wall_texture, tex_normal, texture_size);
-    const Plane right_wall = Plane({bottom_right_back, bottom_right_front, top_right_front, top_right_back}, wall_texture, tex_normal, texture_size);
-    const Plane back_wall = Plane({bottom_left_back, bottom_right_back, top_right_back, top_left_back}, wall_texture, tex_normal, texture_size);
-    const Plane ceiling = Plane({top_right_front, top_left_front, top_left_back, top_right_back}, ceiling_texture, tex_normal, texture_size);
+
+    const Plane floor = Plane({bottom_left_front, bottom_right_front, bottom_right_back, bottom_left_back}, floor_tex, texture_size);
+    const Plane front_wall = Plane({bottom_right_front, bottom_left_front, top_left_front, top_right_front}, wall_tex, texture_size);
+    const Plane left_wall = Plane({bottom_left_front, bottom_left_back, top_left_back, top_left_front}, wall_tex, texture_size);
+    const Plane right_wall = Plane({bottom_right_back, bottom_right_front, top_right_front, top_right_back}, wall_tex, texture_size);
+    const Plane back_wall = Plane({bottom_left_back, bottom_right_back, top_right_back, top_left_back}, wall_tex, texture_size);
+    const Plane ceiling = Plane({top_right_front, top_left_front, top_left_back, top_right_back}, ceiling_tex, texture_size);
 
     return {floor, front_wall, left_wall, right_wall, back_wall, ceiling};
 }
@@ -267,6 +293,7 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
     ImGui::DragFloat("material.shininess", &settings.shininess, 0.25, 0.0, 1000.0);
     ImGui::DragFloat("gamma", &settings.gamma, 0.005, 0.0f, 4.0f);
     ImGui::DragFloat("exposure", &settings.exposure, 0.005, 0.0f, 4.0f);
+    ImGui::DragFloat("height", &settings.height, 0.0005, 0.00f, 1.0f);
     ImGui::End();
 
     ImGui::Render();
@@ -386,7 +413,6 @@ int main() {
     }
 
 
-
     // tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
     stbi_set_flip_vertically_on_load(true);
 
@@ -413,13 +439,15 @@ int main() {
     // load models
     // -----------
     Model model(FileSystem::getPath("resources/objects/backpack/backpack.obj"), true);
-    const auto floor_texture = load_texture("brickwall.jpg", true);
-    const auto floor_normal_texture = load_texture("brickwall_normal.jpg");
-    std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor_texture, floor_normal_texture);
+    const auto floor_texture = load_texture("bricks2.jpg", true);
+    const auto floor_normal_texture = load_texture("bricks2_normal.jpg");
+    const auto floor_height_texture = load_texture("bricks2_disp.jpg");
+    TextureGroup floor {floor_texture, floor_normal_texture, 0, floor_height_texture};
+    std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor, floor, floor);
 
     Framebuffer hdr_buffer{state.window_width, state.window_height};
 
-    Plane screen_plane({{-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}}, hdr_buffer.color_buffer(), 2.0f);
+    Plane screen_plane({{-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}}, TextureGroup{hdr_buffer.color_buffer()}, 2.0f);
 
     // draw in wireframe
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -472,6 +500,7 @@ int main() {
         shader.setFloat("lights[1].quadratic", settings.quadratic);
 
         shader.setFloat("material.shininess", settings.shininess);
+        shader.setFloat("height_scale", settings.height);
         shader.setVec3("viewPos", state.camera.Position);
 
         for (auto& plane : planes) {
