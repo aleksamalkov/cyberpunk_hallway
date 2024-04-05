@@ -224,8 +224,8 @@ struct State
     double mouse_pos_x{};
     double mouse_pos_y{};
     bool gui_enabled{};
-    float window_width{800.0f};
-    float window_height{600.0f};
+    int window_width{800};
+    int window_height{600};
 };
 
 std::vector<Plane> generate_hallway(float width, float height, float length, TextureGroup floor_tex, TextureGroup wall_tex, TextureGroup ceiling_tex)
@@ -303,7 +303,7 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
 class Framebuffer
 {
 public:
-    Framebuffer(float width, float height)
+    Framebuffer(int width, int height)
         : m_width(width), m_height(height)
     {
         glGenFramebuffers(1, &m_framebuffer);
@@ -329,7 +329,7 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    void bind() const
+    void bind()
     {
         glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
     }
@@ -339,12 +339,12 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    unsigned int color_buffer() const
+    unsigned int color_buffer()
     {
         return m_color_buffer;
     }
 
-    void update_size(float width, float height)
+    void update_size(int width, int height)
     {
         if (width != m_width || height != m_height) {
             resize(width, height);
@@ -354,7 +354,7 @@ public:
     }
 
 private:
-    void resize(float width, float height)
+    void resize(int width, int height)
     {
         glBindTexture(GL_TEXTURE_2D, m_color_buffer);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
@@ -364,11 +364,11 @@ private:
         glBindRenderbuffer(GL_RENDERBUFFER, 0);
     }
 
-    float m_width;
-    float m_height;
-    unsigned int m_framebuffer;
-    unsigned int m_color_buffer;
-    unsigned int m_depth_buffer;
+    int m_width{};
+    int m_height{};
+    unsigned int m_framebuffer{};
+    unsigned int m_color_buffer{};
+    unsigned int m_depth_buffer{};
 };
 
 void process_input(GLFWwindow *window, State& state, float delta_time);
@@ -476,7 +476,9 @@ int main() {
         glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        const auto projection = glm::perspective(glm::radians(45.0f), state.window_width / state.window_height, 0.1f, 100.0f);
+        const auto projection = glm::perspective(glm::radians(45.0f),
+                                                 static_cast<float>(state.window_width) / static_cast<float>(state.window_height),
+                                                 0.1f, 100.0f);
 
         shader.use();
         shader.setMat4("model", glm::mat4(1.0f));
@@ -511,7 +513,7 @@ int main() {
         shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(2.f, 2.f, -6.f)));
         model.Draw(shader);
 
-        hdr_buffer.unbind();
+        Framebuffer::unbind();
 
         // post-processing
         // ---------------
