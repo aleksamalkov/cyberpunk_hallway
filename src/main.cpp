@@ -28,7 +28,7 @@ struct Settings
     float shininess = 32.0f;
     float gamma = 2.2f;
     float exposure = 1.0;
-    float height = 0.005;
+    float height = 0.02;
 };
 
 unsigned load_texture(const std::string& filename, bool gamma_correction = false)
@@ -282,7 +282,7 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
 
     ImGui::Begin("Settings");
     ImGui::SetWindowPos({10, 50}, ImGuiCond_Once);
-    ImGui::SetWindowSize({470, 250}, ImGuiCond_Once);
+    ImGui::SetWindowSize({470, 270}, ImGuiCond_Once);
     ImGui::SetWindowCollapsed(false, ImGuiCond_Once);
     ImGui::ColorEdit3("ambient", reinterpret_cast<float *>(&settings.ambient));
     ImGui::ColorEdit3("diffuse", reinterpret_cast<float *>(&settings.diffuse));

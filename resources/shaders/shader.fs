@@ -38,8 +38,7 @@ uniform float height_scale;
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
 {
     float height =  texture(texture_height1, texCoords).r;
-    vec2 p = viewDir.xy / viewDir.z * (height * height_scale);
-    return texCoords - p;
+    return texCoords - viewDir.xy * (height * height_scale);
 }
 
 vec3 BlinnPhong(Light light, vec3 normal, vec3 viewDir, vec2 texCoords, vec3 lightPos)
