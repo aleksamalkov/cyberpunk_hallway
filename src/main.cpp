@@ -346,7 +346,7 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    void bind()
+    void bind() // NOLINT(*-make-member-function-const): Can be used to change framebuffer
     {
         glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
     }
@@ -356,7 +356,7 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    unsigned int color_buffer()
+    unsigned int color_buffer() // NOLINT(*-make-member-function-const): Can be used to change color buffer
     {
         return m_color_buffer;
     }
@@ -371,7 +371,7 @@ public:
     }
 
 private:
-    void resize(int width, int height)
+    void resize(int width, int height) // NOLINT(*-make-member-function-const): Changes framebuffer
     {
         glBindTexture(GL_TEXTURE_2D, m_color_buffer);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
