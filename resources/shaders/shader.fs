@@ -33,12 +33,36 @@ struct Material {
 
 uniform Light lights[NUM_LIGHTS];
 uniform Material material;
-uniform float height_scale;
+uniform float heightScale;
+uniform float minLayers;
+uniform float maxLayers;
 
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
 {
-    float height =  texture(texture_height1, texCoords).r;
-    return texCoords - viewDir.xy * (height * height_scale);
+    float numLayers = mix(maxLayers, minLayers, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));
+    float layerDepth = 1.0 / numLayers;
+    vec2 deltaTexCoords = viewDir.xy * heightScale / numLayers;
+
+    float currentLayerDepth = 0.0;
+    vec2  currentTexCoords = texCoords;
+    float currentDepthMapValue = texture(texture_height1, currentTexCoords).r;
+
+    while(currentLayerDepth < currentDepthMapValue)
+    {
+        currentTexCoords -= deltaTexCoords;
+        currentDepthMapValue = 1.0 - texture(texture_height1, currentTexCoords).r;
+        currentLayerDepth += layerDepth;
+    }
+
+    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+
+    float afterDepth  = currentDepthMapValue - currentLayerDepth;
+    float beforeDepth = 1.0 - texture(texture_height1, prevTexCoords).r - currentLayerDepth + layerDepth;
+
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+
+    return finalTexCoords;
 }
 
 vec3 BlinnPhong(Light light, vec3 normal, vec3 viewDir, vec2 texCoords, vec3 lightPos)

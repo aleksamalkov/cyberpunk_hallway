@@ -29,6 +29,8 @@ struct Settings
     float gamma = 2.2f;
     float exposure = 1.0;
     float height = 0.02;
+    int min_layers = 16;
+    int max_layers = 64;
 };
 
 unsigned load_texture(const std::string& filename, bool gamma_correction = false)
@@ -38,22 +40,35 @@ unsigned load_texture(const std::string& filename, bool gamma_correction = false
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    std::cerr << "Loading texture " + filename;
     int width{}, height{}, channels{};
-    unsigned char* data = stbi_load(FileSystem::getPath("resources/textures/" + filename).c_str(), &width, &height, &channels, 0);
+    unsigned char* data = stbi_load(FileSystem::getPath("resources/textures/" + filename).c_str(), &width, &height, &channels, 3);
     if (!data) {
         throw std::runtime_error("Can't find texture " + filename);
     }
 
     if (channels == 1) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, data);
+        std::cerr << " as GL_RED" << std::endl;
     } else  if (channels == 3) {
-        if (gamma_correction)
+        if (gamma_correction) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        else
+            std::cerr << " as GL_SRGB" << std::endl;
+        } else {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            std::cerr << " as GL_RGB" << std::endl;
+        }
+    } else if (channels == 4) {
+        if (gamma_correction) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB_ALPHA, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            std::cerr << " as GL_SRGB_ALPHA" << std::endl;
+        } else {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            std::cerr << " as GL_RGBA" << std::endl;
+        }
     } else {
         throw std::runtime_error("Texture has " + std::to_string(channels) + " channels");
     }
@@ -274,15 +289,15 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
     ImGui::NewFrame();
 
     ImGui::Begin("FPS");
-    ImGui::SetWindowCollapsed(true, ImGuiCond_Once);
+    ImGui::SetWindowCollapsed(false, ImGuiCond_Once);
     ImGui::SetWindowPos({10, 10}, ImGuiCond_Once);
     ImGui::SetWindowSize({100, 50}, ImGuiCond_Once);
     ImGui::Text("%s", std::to_string(fps_counter.frame_rate).c_str());
     ImGui::End();
 
     ImGui::Begin("Settings");
-    ImGui::SetWindowPos({10, 50}, ImGuiCond_Once);
-    ImGui::SetWindowSize({470, 270}, ImGuiCond_Once);
+    ImGui::SetWindowPos({10, 70}, ImGuiCond_Once);
+    ImGui::SetWindowSize({470, 350}, ImGuiCond_Once);
     ImGui::SetWindowCollapsed(false, ImGuiCond_Once);
     ImGui::ColorEdit3("ambient", reinterpret_cast<float *>(&settings.ambient));
     ImGui::ColorEdit3("diffuse", reinterpret_cast<float *>(&settings.diffuse));
@@ -294,6 +309,8 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
     ImGui::DragFloat("gamma", &settings.gamma, 0.005, 0.0f, 4.0f);
     ImGui::DragFloat("exposure", &settings.exposure, 0.005, 0.0f, 4.0f);
     ImGui::DragFloat("height", &settings.height, 0.0005, 0.00f, 1.0f);
+    ImGui::DragInt("min_layers", &settings.min_layers, 1, 1, 1000);
+    ImGui::DragInt("max_layers", &settings.max_layers, 1, 1, 1000);
     ImGui::End();
 
     ImGui::Render();
@@ -430,6 +447,7 @@ int main() {
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
 
     // build and compile shaders
     // -------------------------
@@ -438,6 +456,7 @@ int main() {
 
     // load models
     // -----------
+    std::cerr << "Loading model backpack" << std::endl;
     Model model(FileSystem::getPath("resources/objects/backpack/backpack.obj"), true);
     const auto floor_texture = load_texture("bricks2.jpg", true);
     const auto floor_normal_texture = load_texture("bricks2_normal.jpg");
@@ -502,7 +521,9 @@ int main() {
         shader.setFloat("lights[1].quadratic", settings.quadratic);
 
         shader.setFloat("material.shininess", settings.shininess);
-        shader.setFloat("height_scale", settings.height);
+        shader.setFloat("heightScale", settings.height);
+        shader.setFloat("minLayers", static_cast<float>(settings.min_layers));
+        shader.setFloat("maxLayers", static_cast<float>(settings.max_layers));
         shader.setVec3("viewPos", state.camera.Position);
 
         for (auto& plane : planes) {
