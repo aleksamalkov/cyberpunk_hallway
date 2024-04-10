@@ -14,6 +14,7 @@ uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_specular1;
 uniform sampler2D texture_normal1;
 uniform sampler2D texture_height1;
+uniform sampler2D texture_emission1;
 
 struct Light {
     vec3 position;
@@ -91,5 +92,8 @@ void main()
     for (int i = 0; i < NUM_LIGHTS; i++) {
         color += BlinnPhong(lights[i], normal, viewDir, texCoords, fs_in.LightPos[i]);
     }
+
+    color += texture(texture_emission1, texCoords).rgb;
+
     FragColor = vec4(color, 1.0);
 }

@@ -82,8 +82,8 @@ unsigned load_texture(const std::string& filename, bool gamma_correction = false
 
 class TextureGroup {
 public:
-    explicit TextureGroup(unsigned diffuse, unsigned normal = 0, unsigned specular = 0, unsigned height = 0)
-        : m_diffuse{diffuse}, m_normal{normal}, m_specular{specular}, m_height{height}
+    explicit TextureGroup(unsigned diffuse, unsigned normal = 0, unsigned specular = 0, unsigned height = 0, unsigned emission = 0)
+        : m_diffuse{diffuse}, m_normal{normal}, m_specular{specular}, m_height{height}, m_emission{emission}
     {
     }
 
@@ -93,22 +93,29 @@ public:
         glUniform1i(glGetUniformLocation(shader.ID, "texture_diffuse1"), 0);
         glBindTexture(GL_TEXTURE_2D, m_diffuse);
         glActiveTexture(GL_TEXTURE1);
+        glUniform1i(glGetUniformLocation(shader.ID, "texture_specular1"), 1);
         if (m_specular) {
-            glUniform1i(glGetUniformLocation(shader.ID, "texture_specular1"), 1);
             glBindTexture(GL_TEXTURE_2D, m_specular);
         } else {
             glBindTexture(GL_TEXTURE_2D, m_diffuse);
         }
         glActiveTexture(GL_TEXTURE2);
+        glUniform1i(glGetUniformLocation(shader.ID, "texture_normal1"), 2);
         if (m_normal) {
-            glUniform1i(glGetUniformLocation(shader.ID, "texture_normal1"), 2);
             glBindTexture(GL_TEXTURE_2D, m_normal);
         } else {
             glBindTexture(GL_TEXTURE_2D, 0);
         }
         glActiveTexture(GL_TEXTURE3);
+        glUniform1i(glGetUniformLocation(shader.ID, "texture_height1"), 3);
         if (m_height) {
-            glUniform1i(glGetUniformLocation(shader.ID, "texture_height1"), 3);
+            glBindTexture(GL_TEXTURE_2D, m_height);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+        glActiveTexture(GL_TEXTURE4);
+        glUniform1i(glGetUniformLocation(shader.ID, "texture_emission1"), 4);
+        if (m_emission) {
             glBindTexture(GL_TEXTURE_2D, m_height);
         } else {
             glBindTexture(GL_TEXTURE_2D, 0);
@@ -125,6 +132,8 @@ public:
         glBindTexture(GL_TEXTURE_2D, 0);
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
 private:
@@ -132,6 +141,7 @@ private:
     unsigned m_normal;
     unsigned m_specular;
     unsigned m_height;
+    unsigned m_emission;
 };
 
 class Plane {
@@ -454,16 +464,14 @@ int main() {
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-//    glEnable(GL_BLEND);
-//    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // build and compile shaders
     // -------------------------
     std::cout << "\nCompiling shaders..." << std::endl;
     std::cout << "Compiling main shader" << std::endl;
     Shader shader("resources/shaders/shader.vs", "resources/shaders/shader.fs");
-    std::cout << "Compiling light shader" << std::endl;
-    Shader light_shader("resources/shaders/light.vs", "resources/shaders/light.fs");
     std::cout << "Compiling bright shader" << std::endl;
     Shader bright_shader("resources/shaders/screen.vs", "resources/shaders/bright.fs");
     std::cout << "Compiling blur shaders" << std::endl;
@@ -475,20 +483,31 @@ int main() {
     // load models
     // -----------
     std::cout << "\nLoading models..." << std::endl;
+
+    stbi_set_flip_vertically_on_load(false);
+
     std::cout << "Loading light model" << std::endl;
-    Model light_model(FileSystem::getPath("resources/objects/light/light.obj"), true);
+    Model light_model(FileSystem::getPath("resources/objects/lamp/lamp.obj"), true);
+
+    std::cout << "Loading arcade model" << std::endl;
+    Model arcade_model(FileSystem::getPath("resources/objects/rusty_japanese_arcade/rusty_japanese_arcade.obj"), true);
+
+    std::cout << "Loading trash model" << std::endl;
+    Model trash_model(FileSystem::getPath("resources/objects/trash/trash.obj"), true);
+
+    stbi_set_flip_vertically_on_load(true);
 
     std::cout << "\nLoading textures..." << std::endl;
 
-//    const auto floor_diffuse_texture = load_texture("Checker_Tiles/Checker_Tiles_DIFF.png", true);
-//    const auto floor_normal_texture = load_texture("Checker_Tiles/Checker_Tiles_NRM.png");
-//    const auto floor_specular_texture = load_texture("Checker_Tiles/Checker_Tiles_SPEC.png");
-//    const auto floor_height_texture = load_texture("Checker_Tiles/Checker_Tiles_Height.png");
+    const auto floor_diffuse_texture = load_texture("Checker_Tiles/Checker_Tiles_DIFF.png", true);
+    const auto floor_normal_texture = load_texture("Checker_Tiles/Checker_Tiles_NRM.png");
+    const auto floor_specular_texture = load_texture("Checker_Tiles/Checker_Tiles_SPEC.png");
+    const auto floor_height_texture = load_texture("Checker_Tiles/Checker_Tiles_Height.png");
 
-    const auto floor_diffuse_texture = load_texture("Marble_Tiles/Marble_Tiles_Diffuse.jpg", true);
-    const auto floor_normal_texture = load_texture("Marble_Tiles/Marble_Tiles_Normal.png");
-    const auto floor_specular_texture = load_texture("Marble_Tiles/Marble_Tiles_Diffuse.jpg");
-    const auto floor_height_texture = load_texture("Marble_Tiles/Marble_Tiles_Displacement.png");
+//    const auto floor_diffuse_texture = load_texture("Marble_Tiles/Marble_Tiles_Diffuse.jpg", true);
+//    const auto floor_normal_texture = load_texture("Marble_Tiles/Marble_Tiles_Normal.png");
+//    const auto floor_specular_texture = load_texture("Marble_Tiles/Marble_Tiles_Diffuse.jpg");
+//    const auto floor_height_texture = load_texture("Marble_Tiles/Marble_Tiles_Displacement.png");
 
     const auto wall_diffuse_texture = load_texture("Dirty_Concrete/Dirty_Concrete_DIFF.png", true);
     const auto wall_normal_texture = load_texture("Dirty_Concrete/Dirty_Concrete_NRM.png");
@@ -566,7 +585,7 @@ int main() {
         shader.setFloat("lights[0].linear", settings.linear);
         shader.setFloat("lights[0].quadratic", settings.quadratic);
         // point light 2
-        shader.setVec3("lights[1].position", glm::vec3{hallway_width / 2, hallway_height, -0.5f});
+        shader.setVec3("lights[1].position", glm::vec3{hallway_width / 2, hallway_height - 0.5f, -0.5f});
         shader.setVec3("lights[1].ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
         shader.setVec3("lights[1].diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
         shader.setVec3("lights[1].specular", settings.specular.r, settings.specular.g, settings.specular.b);
@@ -584,14 +603,23 @@ int main() {
             plane.draw(shader);
         }
 
-        light_shader.use();
-        light_shader.setMat4("model", glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3{hallway_width / 2, hallway_height, -0.5f}), glm::pi<float>(), glm::vec3(1.f, 0.f, 0.f)));
-        light_shader.setMat4("view", view);
-        light_shader.setMat4("projection", projection);
-        light_shader.setVec3("light.ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
-        light_shader.setVec3("light.diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
-        light_shader.setVec3("light.specular", settings.specular.r, settings.specular.g, settings.specular.b);
-        light_model.Draw(light_shader);
+        shader.use();
+        TextureGroup::unbind();
+        glm::mat4 arc_model(1.f);
+        arc_model = glm::translate(arc_model, glm::vec3(0.55f, 0.f, - hallway_length / 2.f));
+        arc_model = glm::rotate(arc_model, glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
+        arc_model = glm::scale(arc_model, glm::vec3(0.5f, 0.5f, 0.5f));
+        shader.setMat4("model", arc_model);
+        arcade_model.Draw(shader);
+
+        TextureGroup::unbind();
+        shader.setMat4("model", glm::translate(glm::mat4(1.f), glm::vec3(hallway_width / 2.f, 0.f, - hallway_length / 2.f)));
+        trash_model.Draw(shader);
+
+        TextureGroup::unbind();
+        shader.use();
+        shader.setMat4("model", glm::scale(glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3{hallway_width / 2, hallway_height, -0.5f}), glm::pi<float>(), glm::vec3(1.f, 0.f, 0.f)), glm::vec3(0.03, 0.03, 0.03)));
+        light_model.Draw(shader);
 
         Framebuffer::unbind();
 
