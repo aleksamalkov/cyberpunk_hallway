@@ -28,13 +28,13 @@ struct Settings
     float shininess = 32.0f;
     float gamma = 2.2f;
     float exposure = 1.0;
-    float height = 0.02;
+    float height = 0.015;
     int min_layers = 16;
     int max_layers = 64;
+    bool bloom = true;
 };
 
-unsigned load_texture(const std::string& filename, bool gamma_correction = false)
-{
+unsigned load_texture(const std::string& filename, bool gamma_correction = false) {
     unsigned texture{};
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -43,7 +43,7 @@ unsigned load_texture(const std::string& filename, bool gamma_correction = false
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    std::cerr << "Loading texture " + filename;
+    std::cout << "Loading texture " + filename + " ";
     int width{}, height{}, channels{};
     unsigned char* data = stbi_load(FileSystem::getPath("resources/textures/" + filename).c_str(), &width, &height, &channels, 3);
     if (!data) {
@@ -52,22 +52,22 @@ unsigned load_texture(const std::string& filename, bool gamma_correction = false
 
     if (channels == 1) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, data);
-        std::cerr << " as GL_RED" << std::endl;
+        std::cout << " asGL_RED" << std::endl;
     } else  if (channels == 3) {
         if (gamma_correction) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-            std::cerr << " as GL_SRGB" << std::endl;
+            std::cout << "as GL_SRGB" << std::endl;
         } else {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-            std::cerr << " as GL_RGB" << std::endl;
+            std::cout << "as GL_RGB" << std::endl;
         }
     } else if (channels == 4) {
         if (gamma_correction) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB_ALPHA, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-            std::cerr << " as GL_SRGB_ALPHA" << std::endl;
+            std::cout << "as GL_SRGB_ALPHA" << std::endl;
         } else {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-            std::cerr << " as GL_RGBA" << std::endl;
+            std::cout << " as GL_RGBA" << std::endl;
         }
     } else {
         throw std::runtime_error("Texture has " + std::to_string(channels) + " channels");
@@ -136,7 +136,7 @@ private:
 
 class Plane {
 public:
-    Plane(const std::vector<glm::vec3>& vertex_pos, TextureGroup textures, float texture_size)
+    Plane(const std::vector<glm::vec3>& vertex_pos, TextureGroup textures, float texture_size = 2.0f)
         : m_textures{textures}
     {
         init(vertex_pos, texture_size);
@@ -311,6 +311,7 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
     ImGui::DragFloat("height", &settings.height, 0.0005, 0.00f, 1.0f);
     ImGui::DragInt("min_layers", &settings.min_layers, 1, 1, 1000);
     ImGui::DragInt("max_layers", &settings.max_layers, 1, 1, 1000);
+    ImGui::Checkbox("bloom", &settings.bloom);
     ImGui::End();
 
     ImGui::Render();
@@ -320,7 +321,7 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
 class Framebuffer
 {
 public:
-    Framebuffer(int width, int height)
+    Framebuffer(int width, int height, bool create_depth_buffer = true)
         : m_width(width), m_height(height)
     {
         glGenFramebuffers(1, &m_framebuffer);
@@ -332,14 +333,18 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        glGenRenderbuffers(1, &m_depth_buffer);
-        glBindRenderbuffer(GL_RENDERBUFFER, m_depth_buffer);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        if (create_depth_buffer) {
+            glGenRenderbuffers(1, &m_depth_buffer);
+            glBindRenderbuffer(GL_RENDERBUFFER, m_depth_buffer);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+            glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        }
 
         glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_color_buffer, 0);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depth_buffer);
+        if (create_depth_buffer) {
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depth_buffer);
+        }
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
             std::cerr << "Error: Framebuffer not complete!" << std::endl;
         }
@@ -376,9 +381,11 @@ private:
         glBindTexture(GL_TEXTURE_2D, m_color_buffer);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
         glBindTexture(GL_TEXTURE_2D, 0);
-        glBindRenderbuffer(GL_RENDERBUFFER, m_depth_buffer);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        if (m_depth_buffer) {
+            glBindRenderbuffer(GL_RENDERBUFFER, m_depth_buffer);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+            glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        }
     }
 
     int m_width{};
@@ -447,32 +454,75 @@ int main() {
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    glEnable(GL_BLEND);
+//    glEnable(GL_BLEND);
+//    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // build and compile shaders
     // -------------------------
+    std::cout << "\nCompiling shaders..." << std::endl;
+    std::cout << "Compiling main shader" << std::endl;
     Shader shader("resources/shaders/shader.vs", "resources/shaders/shader.fs");
+    std::cout << "Compiling light shader" << std::endl;
+    Shader light_shader("resources/shaders/light.vs", "resources/shaders/light.fs");
+    std::cout << "Compiling bright shader" << std::endl;
+    Shader bright_shader("resources/shaders/screen.vs", "resources/shaders/bright.fs");
+    std::cout << "Compiling blur shaders" << std::endl;
+    Shader blur_vertical_shader("resources/shaders/screen.vs", "resources/shaders/blur_vertical.fs");
+    Shader blur_horizontal_shader("resources/shaders/screen.vs", "resources/shaders/blur_horizontal.fs");
+    std::cout << "Compiling tone mapping shader" << std::endl;
     Shader screen_shader("resources/shaders/screen.vs", "resources/shaders/screen.fs");
 
     // load models
     // -----------
-    std::cerr << "Loading model backpack" << std::endl;
-    Model model(FileSystem::getPath("resources/objects/backpack/backpack.obj"), true);
-    const auto floor_texture = load_texture("bricks2.jpg", true);
-    const auto floor_normal_texture = load_texture("bricks2_normal.jpg");
-    const auto floor_height_texture = load_texture("bricks2_disp.jpg");
-    TextureGroup floor {floor_texture, floor_normal_texture, 0, floor_height_texture};
-    std::vector<Plane> planes = generate_hallway(5.f, 5.f, 10.f, floor, floor, floor);
+    std::cout << "\nLoading models..." << std::endl;
+    std::cout << "Loading light model" << std::endl;
+    Model light_model(FileSystem::getPath("resources/objects/light/light.obj"), true);
+
+    std::cout << "\nLoading textures..." << std::endl;
+
+//    const auto floor_diffuse_texture = load_texture("Checker_Tiles/Checker_Tiles_DIFF.png", true);
+//    const auto floor_normal_texture = load_texture("Checker_Tiles/Checker_Tiles_NRM.png");
+//    const auto floor_specular_texture = load_texture("Checker_Tiles/Checker_Tiles_SPEC.png");
+//    const auto floor_height_texture = load_texture("Checker_Tiles/Checker_Tiles_Height.png");
+
+    const auto floor_diffuse_texture = load_texture("Marble_Tiles/Marble_Tiles_Diffuse.jpg", true);
+    const auto floor_normal_texture = load_texture("Marble_Tiles/Marble_Tiles_Normal.png");
+    const auto floor_specular_texture = load_texture("Marble_Tiles/Marble_Tiles_Diffuse.jpg");
+    const auto floor_height_texture = load_texture("Marble_Tiles/Marble_Tiles_Displacement.png");
+
+    const auto wall_diffuse_texture = load_texture("Dirty_Concrete/Dirty_Concrete_DIFF.png", true);
+    const auto wall_normal_texture = load_texture("Dirty_Concrete/Dirty_Concrete_NRM.png");
+    const auto wall_specular_texture = load_texture("Dirty_Concrete/Dirty_Concrete_SPEC.png");
+    const auto wall_height_texture = load_texture("Dirty_Concrete/Dirty_Concrete_DISP.png");
+
+//    const auto wall_diffuse_texture = load_texture("Concrete_02/Concrete_02_albedo.png", true);
+//    const auto wall_normal_texture = load_texture("Concrete_02/Concrete_02_normal.png");
+//    const auto wall_specular_texture = load_texture("Concrete_02/Concrete_02_albedo.png");
+//    const auto wall_height_texture = load_texture("Concrete_02/Concrete_02_height.png");
+
+    TextureGroup floor {floor_diffuse_texture, floor_normal_texture, floor_specular_texture, floor_height_texture};
+    TextureGroup wall {wall_diffuse_texture, wall_normal_texture, wall_specular_texture, wall_height_texture};
+    const float hallway_width = 5.f;
+    const float hallway_height = 4.f;
+    const float hallway_length = 10.f;
+    std::vector<Plane> planes = generate_hallway(hallway_width, hallway_height, hallway_length, floor, wall, wall);
 
     Framebuffer hdr_buffer{state.window_width, state.window_height};
+    Framebuffer bright_buffer{state.window_width, state.window_height, false};
+    Framebuffer blur_buffer{state.window_width, state.window_height, false};
 
-    Plane screen_plane({{-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}}, TextureGroup{hdr_buffer.color_buffer()}, 2.0f);
+    Plane screen_plane({{-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}}, TextureGroup{hdr_buffer.color_buffer()});
+    Plane bright_plane({{-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}}, TextureGroup{bright_buffer.color_buffer(), 0, hdr_buffer.color_buffer()});
+    Plane blur_plane({{-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}}, TextureGroup{blur_buffer.color_buffer()});
 
     // draw in wireframe
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+    std::cout << "\nLoading done\n" << std::endl;
+
     constexpr glm::vec3 clear_color{0.0f, 0.0f, 0.0f};
-    state.camera.Position += glm::vec3{2.5f, 2.5f, -5.0f};
+    state.camera.Position += glm::vec3{2.5f, 1.5f, -5.0f};
+    state.camera.Front = glm::vec3{0.0f, 0.0f, -1.0f};
 
     FPS_counter fps_counter;
 
@@ -487,6 +537,8 @@ int main() {
         // -----
         process_input(window, state, static_cast<float>(delta_time));
         hdr_buffer.update_size(state.window_width, state.window_height);
+        bright_buffer.update_size(state.window_width, state.window_height);
+        blur_buffer.update_size(state.window_width, state.window_height);
 
 
         // render to framebuffer
@@ -499,12 +551,14 @@ int main() {
                                                  static_cast<float>(state.window_width) / static_cast<float>(state.window_height),
                                                  0.1f, 100.0f);
 
+        const auto view = state.camera.GetViewMatrix();
+
         shader.use();
         shader.setMat4("model", glm::mat4(1.0f));
-        shader.setMat4("view", state.camera.GetViewMatrix());
+        shader.setMat4("view", view);
         shader.setMat4("projection", projection);
         // point light 1
-        shader.setVec3("lights[0].position", glm::vec3{4.f, 1.f, -1.f});
+        shader.setVec3("lights[0].position", glm::vec3{4.f, 1.f, -9.f});
         shader.setVec3("lights[0].ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
         shader.setVec3("lights[0].diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
         shader.setVec3("lights[0].specular", settings.specular.r, settings.specular.g, settings.specular.b);
@@ -512,7 +566,7 @@ int main() {
         shader.setFloat("lights[0].linear", settings.linear);
         shader.setFloat("lights[0].quadratic", settings.quadratic);
         // point light 2
-        shader.setVec3("lights[1].position", glm::vec3{1.f, 4.f, -6.f});
+        shader.setVec3("lights[1].position", glm::vec3{hallway_width / 2, hallway_height, -0.5f});
         shader.setVec3("lights[1].ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
         shader.setVec3("lights[1].diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
         shader.setVec3("lights[1].specular", settings.specular.r, settings.specular.g, settings.specular.b);
@@ -520,7 +574,7 @@ int main() {
         shader.setFloat("lights[1].linear", settings.linear);
         shader.setFloat("lights[1].quadratic", settings.quadratic);
 
-        shader.setFloat("material.shininess", settings.shininess);
+        shader.setFloat("shininess", settings.shininess);
         shader.setFloat("heightScale", settings.height);
         shader.setFloat("minLayers", static_cast<float>(settings.min_layers));
         shader.setFloat("maxLayers", static_cast<float>(settings.max_layers));
@@ -530,21 +584,60 @@ int main() {
             plane.draw(shader);
         }
 
-        shader.use();
-        shader.setMat4("model", glm::translate(glm::mat4(1.0f), glm::vec3(2.f, 2.f, -6.f)));
-        model.Draw(shader);
+        light_shader.use();
+        light_shader.setMat4("model", glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3{hallway_width / 2, hallway_height, -0.5f}), glm::pi<float>(), glm::vec3(1.f, 0.f, 0.f)));
+        light_shader.setMat4("view", view);
+        light_shader.setMat4("projection", projection);
+        light_shader.setVec3("light.ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
+        light_shader.setVec3("light.diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
+        light_shader.setVec3("light.specular", settings.specular.r, settings.specular.g, settings.specular.b);
+        light_model.Draw(light_shader);
 
         Framebuffer::unbind();
 
-        // post-processing
-        // ---------------
+        if (settings.bloom) {
+            // extract bright fragments
+            // ------------------------
+            bright_buffer.bind();
+            glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            bright_shader.use();
+            screen_plane.draw(bright_shader);
+            Framebuffer::unbind();
+
+            // blur bright fragments
+            // ---------------------
+            blur_buffer.bind();
+            glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            Framebuffer::unbind();
+
+            const int blur_amount = 5;
+            for (int i = 0; i < blur_amount; i++) {
+                blur_buffer.bind();
+                bright_plane.draw(blur_horizontal_shader);
+                Framebuffer::unbind();
+
+                bright_buffer.bind();
+                blur_plane.draw(blur_vertical_shader);
+                Framebuffer::unbind();
+            }
+        } else {
+            bright_buffer.bind();
+            glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            Framebuffer::unbind();
+        }
+
+        // tone-mapping
+        // ------------
         glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         screen_shader.use();
         screen_shader.setFloat("gamma", settings.gamma);
         screen_shader.setFloat("exposure", settings.exposure);
-        screen_plane.draw(screen_shader);
+        bright_plane.draw(screen_shader);
 
 
         if (state.gui_enabled) {

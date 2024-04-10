@@ -27,12 +27,8 @@ struct Light {
     float quadratic;
 };
 
-struct Material {
-    float shininess;
-};
-
+uniform float shininess;
 uniform Light lights[NUM_LIGHTS];
-uniform Material material;
 uniform float heightScale;
 uniform float minLayers;
 uniform float maxLayers;
@@ -74,7 +70,7 @@ vec3 BlinnPhong(Light light, vec3 normal, vec3 viewDir, vec2 texCoords, vec3 lig
     vec3 diffuse = light.diffuse * max(dot(normal, lightDir), 0.0) * vec3(texture(texture_diffuse1, texCoords));
 
     vec3 halfwayDir = normalize(lightDir + viewDir);
-    vec3 specular = light.specular * pow(max(dot(normal, halfwayDir), 0.0), material.shininess)
+    vec3 specular = light.specular * pow(max(dot(normal, halfwayDir), 0.0), shininess)
             * texture(texture_specular1, texCoords).xxx;
 
     float distance = length(lightPos - fs_in.FragPos);
