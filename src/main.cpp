@@ -17,6 +17,23 @@
 #include <stdexcept>
 #include <vector>
 
+// executes and action on the exit from scope
+// from the book "A Tour Of C++" by Bjarne Stroustrup
+template <class F>
+struct Final_action {
+    explicit Final_action(F f) :act(f) {}
+    ~Final_action() { act(); }
+    F act;
+};
+
+// takes an action to be executed on the exit from scope
+// from the book "A Tour Of C++" by Bjarne Stroustrup
+template <class F>
+[[nodiscard]] auto finally(F f)
+{
+    return Final_action{f};
+}
+
 struct Settings
 {
     glm::vec3 ambient {0.05f, 0.05f, 0.05f};
@@ -160,6 +177,22 @@ public:
         unbind();
     }
 
+    Plane(const Plane&) = delete;
+    Plane& operator=(const Plane&) = delete;
+
+    ~Plane()
+    {
+        glDeleteVertexArrays(1, &m_VAO);
+        glDeleteBuffers(1, &m_VBO);
+    }
+
+    Plane(Plane&& p) noexcept
+        : m_textures(p.m_textures), m_VAO{p.m_VAO}, m_VBO{p.m_VBO}
+    {
+        p.m_VAO = 0;
+        p.m_VBO = 0;
+    }
+
 private:
     void init(const std::vector<glm::vec3>& vertex_pos, float texture_size)
     {
@@ -198,7 +231,6 @@ private:
                 vertex_pos[0].x, vertex_pos[0].y, vertex_pos[0].z, normal.x, normal.y, normal.z, tex_pos[0].x, tex_pos[0].y, // bottom left
                 tangent.x, tangent.y, tangent.z
         };
-        // TODO: destruct them later
         glGenVertexArrays(1, &m_VAO);
         glGenBuffers(1, &m_VBO);
 
@@ -239,8 +271,8 @@ private:
     }
 
     TextureGroup m_textures;
-    unsigned m_VBO{};
     unsigned m_VAO{};
+    unsigned m_VBO{};
 };
 
 struct State
@@ -266,14 +298,19 @@ std::vector<Plane> generate_hallway(float width, float height, float length, Tex
     const glm::vec3 top_left_back{0.f, height, -length};
 
 
-    const Plane floor = Plane({bottom_left_front, bottom_right_front, bottom_right_back, bottom_left_back}, floor_tex, texture_size);
-    const Plane front_wall = Plane({bottom_right_front, bottom_left_front, top_left_front, top_right_front}, wall_tex, texture_size);
-    const Plane left_wall = Plane({bottom_left_front, bottom_left_back, top_left_back, top_left_front}, wall_tex, texture_size);
-    const Plane right_wall = Plane({bottom_right_back, bottom_right_front, top_right_front, top_right_back}, wall_tex, texture_size);
-    const Plane back_wall = Plane({bottom_left_back, bottom_right_back, top_right_back, top_left_back}, wall_tex, texture_size);
-    const Plane ceiling = Plane({top_right_front, top_left_front, top_left_back, top_right_back}, ceiling_tex, texture_size);
+    std::vector<Plane> planes;
+    planes.reserve(6);
+    // floor
+    planes.push_back(Plane({bottom_left_front, bottom_right_front, bottom_right_back, bottom_left_back}, floor_tex, texture_size));
+    // walls
+    planes.push_back(Plane({bottom_right_front, bottom_left_front, top_left_front, top_right_front}, wall_tex, texture_size)); // front
+    planes.push_back(Plane({bottom_left_front, bottom_left_back, top_left_back, top_left_front}, wall_tex, texture_size)); // left
+    planes.push_back(Plane({bottom_right_back, bottom_right_front, top_right_front, top_right_back}, wall_tex, texture_size)); // right
+    planes.push_back(Plane({bottom_left_back, bottom_right_back, top_right_back, top_left_back}, wall_tex, texture_size)); // back
+    // ceiling
+    planes.push_back(Plane({top_right_front, top_left_front, top_left_back, top_right_back}, ceiling_tex, texture_size));
 
-    return {floor, front_wall, left_wall, right_wall, back_wall, ceiling};
+    return planes;
 }
 
 class FPS_counter
@@ -361,6 +398,17 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
+    Framebuffer(const Framebuffer&) = delete;
+    Framebuffer& operator=(const Framebuffer&) = delete;
+
+    ~Framebuffer()
+    {
+        glDeleteTextures(1, &m_color_buffer);
+        if (m_depth_buffer)
+            glDeleteRenderbuffers(1, &m_depth_buffer);
+        glDeleteFramebuffers(1, &m_framebuffer);
+    }
+
     void bind() // NOLINT(*-make-member-function-const): Can be used to change framebuffer
     {
         glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
@@ -417,6 +465,7 @@ int main() {
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
+    auto terminate_glfw = finally([&]{glfwTerminate();});
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -425,8 +474,7 @@ int main() {
     // --------------------
     GLFWwindow *window = glfwCreateWindow(state.window_width, state.window_height, "LearnOpenGL", nullptr, nullptr);
     if (window == nullptr) {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
+        std::cerr << "Failed to create GLFW window" << std::endl;
         return -1;
     }
     glfwMakeContextCurrent(window);
@@ -459,6 +507,12 @@ int main() {
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330 core");
+
+    auto imgui_destroy = finally([&]{
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+    });
 
     // configure global opengl state
     // -----------------------------
@@ -518,6 +572,18 @@ int main() {
 //    const auto wall_normal_texture = load_texture("Concrete_02/Concrete_02_normal.png");
 //    const auto wall_specular_texture = load_texture("Concrete_02/Concrete_02_albedo.png");
 //    const auto wall_height_texture = load_texture("Concrete_02/Concrete_02_height.png");
+
+    auto delete_textures = finally([&]{
+        glDeleteTextures(1, &floor_diffuse_texture);
+        glDeleteTextures(1, &floor_normal_texture);
+        glDeleteTextures(1, &floor_specular_texture);
+        glDeleteTextures(1, &floor_height_texture);
+
+        glDeleteTextures(1, &wall_diffuse_texture);
+        glDeleteTextures(1, &wall_normal_texture);
+        glDeleteTextures(1, &wall_specular_texture);
+        glDeleteTextures(1, &wall_height_texture);
+    });
 
     TextureGroup floor {floor_diffuse_texture, floor_normal_texture, floor_specular_texture, floor_height_texture};
     TextureGroup wall {wall_diffuse_texture, wall_normal_texture, wall_specular_texture, wall_height_texture};
@@ -678,12 +744,6 @@ int main() {
         glfwPollEvents();
     }
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
-    glfwTerminate();
     return 0;
 }
 
