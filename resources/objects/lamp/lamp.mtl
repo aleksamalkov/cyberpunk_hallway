@@ -1,0 +1,13 @@
+# Blender 4.1.0 MTL File: 'None'
+# www.blender.org
+
+newmtl Lamp
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Lamp_baseColor.png
+map_Ke Lamp_emissive.png
+map_Bump -bm 1.000000 Lamp_normal.png

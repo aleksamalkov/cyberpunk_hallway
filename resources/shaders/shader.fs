@@ -95,5 +95,6 @@ void main()
 
     color += texture(texture_emission1, texCoords).rgb;
 
-    FragColor = vec4(color, 1.0);
+    float alpha = texture(texture_diffuse1, texCoords).a;
+    FragColor = vec4(color, alpha);
 }

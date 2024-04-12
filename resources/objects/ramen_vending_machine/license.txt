@@ -1,0 +1,11 @@
+Model Information:
+* title:	Ramen Vending Machine
+* source:	https://sketchfab.com/3d-models/ramen-vending-machine-3d3c8affeaa44620b7a04fa4a987ff99
+* author:	JustFaith (https://sketchfab.com/charljustine)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Ramen Vending Machine" (https://sketchfab.com/3d-models/ramen-vending-machine-3d3c8affeaa44620b7a04fa4a987ff99) by JustFaith (https://sketchfab.com/charljustine) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

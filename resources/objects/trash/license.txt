@@ -1,0 +1,11 @@
+Model Information:
+* title:	Trash
+* source:	https://sketchfab.com/3d-models/trash-6d5cccf0ec51417c91c1d29a07160a58
+* author:	schmoldt.art (https://sketchfab.com/schmoldt.art)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Trash" (https://sketchfab.com/3d-models/trash-6d5cccf0ec51417c91c1d29a07160a58) by schmoldt.art (https://sketchfab.com/schmoldt.art) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

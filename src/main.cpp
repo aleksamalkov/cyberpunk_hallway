@@ -37,18 +37,22 @@ template <class F>
 struct Settings
 {
     glm::vec3 ambient {0.05f, 0.05f, 0.05f};
-    glm::vec3 diffuse {0.8f, 0.8f, 0.8f};
-    glm::vec3 specular {1.0f, 1.0f, 1.0f};
+    glm::vec3 diffuse {0.8f, 2.8f, 0.8f};
+    glm::vec3 specular {3.0f, 2.5f, 1.0f};
+    glm::vec3 ambient1 {0.05f, 0.05f, 0.05f};
+    glm::vec3 diffuse1 {1.8f, 0.8f, 0.8f};
+    glm::vec3 specular1 {3.5f, 2.0f, 1.0f};
     float constant = 1.0f;
-    float linear = 0.35f;
-    float quadratic = 0.44f;
+    float linear = 0.9f;
+    float quadratic = 0.24f;
     float shininess = 32.0f;
     float gamma = 2.2f;
-    float exposure = 1.0;
-    float height = 0.015;
-    int min_layers = 16;
-    int max_layers = 64;
+    float exposure = 0.8f;
+    float height = 0.01f;
+    int min_layers = 4;
+    int max_layers = 8;
     bool bloom = true;
+    int blur_amount = 4;
 };
 
 unsigned load_texture(const std::string& filename, bool gamma_correction = false) {
@@ -281,8 +285,8 @@ struct State
     double mouse_pos_x{};
     double mouse_pos_y{};
     bool gui_enabled{};
-    int window_width{800};
-    int window_height{600};
+    int window_width{1280};
+    int window_height{720};
 };
 
 std::vector<Plane> generate_hallway(float width, float height, float length, TextureGroup floor_tex, TextureGroup wall_tex, TextureGroup ceiling_tex)
@@ -349,6 +353,9 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
     ImGui::ColorEdit3("ambient", reinterpret_cast<float *>(&settings.ambient));
     ImGui::ColorEdit3("diffuse", reinterpret_cast<float *>(&settings.diffuse));
     ImGui::ColorEdit3("specular", reinterpret_cast<float *>(&settings.specular));
+    ImGui::ColorEdit3("ambient1", reinterpret_cast<float *>(&settings.ambient1));
+    ImGui::ColorEdit3("diffuse1", reinterpret_cast<float *>(&settings.diffuse1));
+    ImGui::ColorEdit3("specular1", reinterpret_cast<float *>(&settings.specular1));
     ImGui::DragFloat("pointLight.constant", &settings.constant, 0.005, 0.0, 2.0);
     ImGui::DragFloat("pointLight.linear", &settings.linear, 0.005, 0.0, 2.0);
     ImGui::DragFloat("pointLight.quadratic", &settings.quadratic, 0.005, 0.0, 2.0);
@@ -359,6 +366,7 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
     ImGui::DragInt("min_layers", &settings.min_layers, 1, 1, 1000);
     ImGui::DragInt("max_layers", &settings.max_layers, 1, 1, 1000);
     ImGui::Checkbox("bloom", &settings.bloom);
+    ImGui::DragInt("bloom blur amount", &settings.blur_amount, 1, 0, 100);
     ImGui::End();
 
     ImGui::Render();
@@ -378,6 +386,8 @@ public:
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glBindTexture(GL_TEXTURE_2D, 0);
 
         if (create_depth_buffer) {
@@ -540,16 +550,22 @@ int main() {
 
     stbi_set_flip_vertically_on_load(false);
 
-    std::cout << "Loading light model" << std::endl;
+    std::cout << "Loading lamp model" << std::endl;
     Model light_model(FileSystem::getPath("resources/objects/lamp/lamp.obj"), true);
-
     std::cout << "Loading arcade model" << std::endl;
     Model arcade_model(FileSystem::getPath("resources/objects/rusty_japanese_arcade/rusty_japanese_arcade.obj"), true);
-
     std::cout << "Loading trash model" << std::endl;
     Model trash_model(FileSystem::getPath("resources/objects/trash/trash.obj"), true);
-
+    std::cout << "Loading door model" << std::endl;
+    Model door_model(FileSystem::getPath("resources/objects/door/door.obj"), false);
+    std::cout << "Loading vending machine model" << std::endl;
+    Model vending_model(FileSystem::getPath("resources/objects/ramen_vending_machine/vending.obj"), true);
+    std::cout << "Loading poster model" << std::endl;
+    Model poster_model(FileSystem::getPath("resources/objects/poster/poster.obj"), true);
+    std::cout << "Loading bottle model" << std::endl;
+    Model bottle_model(FileSystem::getPath("resources/objects/broken_glass_bottle/bottle.obj"), false);
     stbi_set_flip_vertically_on_load(true);
+
 
     std::cout << "\nLoading textures..." << std::endl;
 
@@ -632,7 +648,7 @@ int main() {
         glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        const auto projection = glm::perspective(glm::radians(45.0f),
+        const auto projection = glm::perspective(glm::radians(60.0f),
                                                  static_cast<float>(state.window_width) / static_cast<float>(state.window_height),
                                                  0.1f, 100.0f);
 
@@ -643,10 +659,10 @@ int main() {
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
         // point light 1
-        shader.setVec3("lights[0].position", glm::vec3{4.f, 1.f, -9.f});
-        shader.setVec3("lights[0].ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
-        shader.setVec3("lights[0].diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
-        shader.setVec3("lights[0].specular", settings.specular.r, settings.specular.g, settings.specular.b);
+        shader.setVec3("lights[0].position", glm::vec3{hallway_width - 0.5f, hallway_height - 0.5f, -3.f * hallway_length / 4.f});
+        shader.setVec3("lights[0].ambient", settings.ambient1.r, settings.ambient1.g, settings.ambient1.b);
+        shader.setVec3("lights[0].diffuse", settings.diffuse1.r, settings.diffuse1.g, settings.diffuse1.b);
+        shader.setVec3("lights[0].specular", settings.specular1.r, settings.specular1.g, settings.specular1.b);
         shader.setFloat("lights[0].constant", settings.constant);
         shader.setFloat("lights[0].linear", settings.linear);
         shader.setFloat("lights[0].quadratic", settings.quadratic);
@@ -670,22 +686,97 @@ int main() {
         }
 
         shader.use();
-        TextureGroup::unbind();
-        glm::mat4 arc_model(1.f);
-        arc_model = glm::translate(arc_model, glm::vec3(0.55f, 0.f, - hallway_length / 2.f));
-        arc_model = glm::rotate(arc_model, glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
-        arc_model = glm::scale(arc_model, glm::vec3(0.5f, 0.5f, 0.5f));
-        shader.setMat4("model", arc_model);
-        arcade_model.Draw(shader);
 
-        TextureGroup::unbind();
-        shader.setMat4("model", glm::translate(glm::mat4(1.f), glm::vec3(hallway_width / 2.f, 0.f, - hallway_length / 2.f)));
-        trash_model.Draw(shader);
+        {
+            // arcade machine
+            TextureGroup::unbind();
+            glm::mat4 model(1.f);
+            model = glm::translate(model, glm::vec3(0.55f, 0.f, -hallway_length / 3.f));
+            model = glm::rotate(model, glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
+            model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));
+            shader.setMat4("model", model);
+            arcade_model.Draw(shader);
+        }
 
-        TextureGroup::unbind();
-        shader.use();
-        shader.setMat4("model", glm::scale(glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3{hallway_width / 2, hallway_height, -0.5f}), glm::pi<float>(), glm::vec3(1.f, 0.f, 0.f)), glm::vec3(0.03, 0.03, 0.03)));
-        light_model.Draw(shader);
+        {
+            // trash
+            TextureGroup::unbind();
+            glm::mat4 model(1.f);
+            model = glm::translate(model, glm::vec3(hallway_width / 2.f, 0.f, -1.f));
+            shader.setMat4("model", model);
+            trash_model.Draw(shader);
+        }
+
+        {
+            // doors
+            TextureGroup::unbind();
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, glm::vec3(hallway_width - 0.1f, 0.f, -hallway_length / 2.f));
+            model = glm::rotate(model, -glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
+            shader.setMat4("model", model);
+            door_model.Draw(shader);
+            shader.setMat4("model",
+                           glm::rotate(
+                                   glm::translate(glm::mat4(1.f),
+                                                  glm::vec3(hallway_width - 0.1f, 0.f, -hallway_length / 4.f)),
+                                   -glm::pi<float>() / 2.f,
+                                   glm::vec3(0.f, 1.f, 0.f)
+                           )
+            );
+            door_model.Draw(shader);
+        }
+
+        {
+            // ramen machine
+            TextureGroup::unbind();
+            glm::mat4 model(1.f);
+            model = glm::translate(model, glm::vec3(0.4, 0.f, - 2.f * hallway_length / 3.f));
+            model = glm::rotate(model, glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
+            model = glm::scale(model, glm::vec3(1.2f, 1.2f, 1.2f));
+            shader.setMat4("model", model);
+            vending_model.Draw(shader);
+        }
+
+        {
+            // poster
+            TextureGroup::unbind();
+            glm::mat4 model(1.f);
+            model = glm::translate(model, glm::vec3(hallway_width - 0.03f, hallway_height / 2.f, - 3.f * hallway_length / 4.f));
+            model = glm::rotate(model, -glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
+            model = glm::scale(model, glm::vec3(1.2f, 1.2f, 1.2f));
+            shader.setMat4("model", model);
+            poster_model.Draw(shader);
+        }
+
+        {
+            // bottle
+            TextureGroup::unbind();
+            glm::mat4 model(1.f);
+            model = glm::translate(model, glm::vec3(hallway_width / 2.f, 0.1f, -hallway_length / 2.f));
+            model = glm::rotate(model, glm::pi<float>() / 2.f, glm::vec3(1.f, 0.f, 0.f));
+            model = glm::scale(model, glm::vec3(0.01f, 0.01f, 0.01f));
+            shader.setMat4("model", model);
+            bottle_model.Draw(shader);
+        }
+
+        {
+            // lamp
+            TextureGroup::unbind();
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, glm::vec3{hallway_width / 2, hallway_height, -0.2f});
+            model = glm::rotate(model, glm::pi<float>(), glm::vec3(1.f, 0.f, 0.f));
+            model = glm::scale(model, glm::vec3(0.03, 0.03, 0.03));
+            shader.setMat4("model", model);
+            light_model.Draw(shader);
+
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3{hallway_width - 0.2f, hallway_height, -3.f * hallway_length / 4.f});
+            model = glm::rotate(model, glm::pi<float>(), glm::vec3(1.f, 0.f, 0.f));
+            model = glm::rotate(model, glm::pi<float>() / 2, glm::vec3(0.f, 1.f, 0.f));
+            model = glm::scale(model, glm::vec3(0.03, 0.03, 0.03));
+            shader.setMat4("model", model);
+            light_model.Draw(shader);
+        }
 
         Framebuffer::unbind();
 
@@ -706,7 +797,7 @@ int main() {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             Framebuffer::unbind();
 
-            const int blur_amount = 5;
+            const int blur_amount = settings.blur_amount;
             for (int i = 0; i < blur_amount; i++) {
                 blur_buffer.bind();
                 bright_plane.draw(blur_horizontal_shader);

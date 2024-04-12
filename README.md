@@ -1,11 +1,10 @@
-# project_base
-Prazan projekat sa pratećim bibliotekama koje koristimo na času. 
-
-# Uputstvo
-1. `git clone https://github.com/matf-racunarska-grafika/project_base.git`
-2. CLion -> Open -> path/to/my/project_base
-3. Main se nalazi u src/main.cpp
-4. Cpp fajlovi idu u src folder
-5. Zaglavlja (h i hpp) fajlovi idu u include
-6. Šejderi idu u folder shaders. `Vertex shader` ima ekstenziju `.vs`, `fragment shader` ima ekstenziju `.fs`
-7. ALT+SHIFT+F10 -> project_base -> run
+# Models and Textures
+1. Checker Tiles 01 - Pixel-Furnace (https://textures.pixel-furnace.com/texture?name=Checker%20Tiles%2001)
+2. Dirty Concrete - Pixel-Furnace (https://textures.pixel-furnace.com/texture?name=Dirty%20Concrete)
+3. "Lamp" (https://skfb.ly/ouMZ8) by Shedmon is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+4. "Rusty Japanese Arcade" (https://skfb.ly/oDxIL) by Toni García Vilche is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+5. "Trash" (https://skfb.ly/oMHzI) by schmoldt.art is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+6. "low poly sci fi door" (https://skfb.ly/oRVwB) by ElQuEtZaL is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+7. "Ramen Vending Machine" (https://skfb.ly/otUrG) by JustFaith is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+8. "Worn Sci-Fi Retro Travel Poster" (https://skfb.ly/oKPqM) by Kami Rapacz is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+9. "Broken Glass Bottle LOW POLY FINAL" (https://skfb.ly/osnYV) by LeoLevito is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).

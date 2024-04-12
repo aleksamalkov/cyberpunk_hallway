@@ -1,0 +1,23 @@
+# Blender 4.1.0 MTL File: 'None'
+# www.blender.org
+
+newmtl Arcade
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.200000 0.200000 0.200000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Arcade_baseColor.png
+map_Ke Arcade_emissive.png
+map_Bump -bm 1.000000 Arcade_normal.png
+
+newmtl Material.001
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.000000 0.000000 0.000000
+Ks 0.000000 0.000000 0.000000
+Ke 4.700747 0.241297 5.000000
+Ni 1.500000
+d 1.000000
+illum 1
