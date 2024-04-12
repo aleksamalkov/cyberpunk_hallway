@@ -1,0 +1,11 @@
+Model Information:
+* title:	low poly sci fi door
+* source:	https://sketchfab.com/3d-models/low-poly-sci-fi-door-6c1103fe45d042ebaeb35e7e5aaff977
+* author:	ElQuEtZaL (https://sketchfab.com/ElQuEtZaL)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "low poly sci fi door" (https://sketchfab.com/3d-models/low-poly-sci-fi-door-6c1103fe45d042ebaeb35e7e5aaff977) by ElQuEtZaL (https://sketchfab.com/ElQuEtZaL) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

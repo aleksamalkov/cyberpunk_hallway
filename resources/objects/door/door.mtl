@@ -1,0 +1,67 @@
+# Blender 4.1.0 MTL File: 'untitled.blend'
+# www.blender.org
+
+newmtl Material.007
+Ns 54.981804
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 10.000000 10.000000 10.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd white.png
+map_Ks white.png
+
+newmtl door_materail
+Ns 10.813354
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd door_color.png
+map_Ks door_color.png
+
+newmtl door_materail_4
+Ns 13.381043
+Ka 1.000000 1.000000 1.000000
+Kd 0.816868 0.526901 0.165682
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+
+newmtl door_material2
+Ns 0.001306
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd black.png
+map_Ks black.png
+
+newmtl door_material3
+Ns 2.511106
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd grey.png
+map_Ks grey.png
+
+newmtl marco_door
+Ns 0.023675
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd dark_grey.png
+map_Ks dark_grey.png

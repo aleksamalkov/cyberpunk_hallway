@@ -543,6 +543,8 @@ int main() {
     std::cout << "\nCompiling shaders..." << std::endl;
     std::cout << "Compiling main shader" << std::endl;
     Shader shader("resources/shaders/shader.vs", "resources/shaders/shader.fs");
+    std::cout << "Compiling no normal mapping shader" << std::endl;
+    Shader no_normal_shader("resources/shaders/shader.vs", "resources/shaders/no_normal_mapping.fs");
     std::cout << "Compiling bright fragment extraction shader" << std::endl;
     Shader bright_shader("resources/shaders/screen.vs", "resources/shaders/bright.fs");
     std::cout << "Compiling blur shaders" << std::endl;
@@ -564,15 +566,15 @@ int main() {
     std::cout << "Loading trash model" << std::endl;
     Model trash_model(FileSystem::getPath("resources/objects/trash/trash.obj"), true);
     std::cout << "Loading door model" << std::endl;
-    Model door_model(FileSystem::getPath("resources/objects/door/door.obj"), false);
+    Model door_model(FileSystem::getPath("resources/objects/door/door.obj"), true);
     std::cout << "Loading vending machine model" << std::endl;
     Model vending_model(FileSystem::getPath("resources/objects/ramen_vending_machine/vending.obj"), true);
     std::cout << "Loading poster model" << std::endl;
     Model poster_model(FileSystem::getPath("resources/objects/poster/poster.obj"), true);
     std::cout << "Loading bottle model" << std::endl;
     Model bottle_model(FileSystem::getPath("resources/objects/broken_glass_bottle/bottle.obj"), false);
-    stbi_set_flip_vertically_on_load(true);
 
+    stbi_set_flip_vertically_on_load(true);
 
     std::cout << "\nLoading textures..." << std::endl;
 
@@ -581,20 +583,10 @@ int main() {
     const auto floor_specular_texture = load_texture("Checker_Tiles/Checker_Tiles_SPEC.png");
     const auto floor_height_texture = load_texture("Checker_Tiles/Checker_Tiles_Height.png");
 
-//    const auto floor_diffuse_texture = load_texture("Marble_Tiles/Marble_Tiles_Diffuse.jpg", true);
-//    const auto floor_normal_texture = load_texture("Marble_Tiles/Marble_Tiles_Normal.png");
-//    const auto floor_specular_texture = load_texture("Marble_Tiles/Marble_Tiles_Diffuse.jpg");
-//    const auto floor_height_texture = load_texture("Marble_Tiles/Marble_Tiles_Displacement.png");
-
     const auto wall_diffuse_texture = load_texture("Dirty_Concrete/Dirty_Concrete_DIFF.png", true);
     const auto wall_normal_texture = load_texture("Dirty_Concrete/Dirty_Concrete_NRM.png");
     const auto wall_specular_texture = load_texture("Dirty_Concrete/Dirty_Concrete_SPEC.png");
     const auto wall_height_texture = load_texture("Dirty_Concrete/Dirty_Concrete_DISP.png");
-
-//    const auto wall_diffuse_texture = load_texture("Concrete_02/Concrete_02_albedo.png", true);
-//    const auto wall_normal_texture = load_texture("Concrete_02/Concrete_02_normal.png");
-//    const auto wall_specular_texture = load_texture("Concrete_02/Concrete_02_albedo.png");
-//    const auto wall_height_texture = load_texture("Concrete_02/Concrete_02_height.png");
 
     auto delete_textures = finally([&]{
         glDeleteTextures(1, &floor_diffuse_texture);
@@ -686,14 +678,38 @@ int main() {
         shader.setFloat("maxLayers", static_cast<float>(settings.max_layers));
         shader.setVec3("viewPos", state.camera.Position);
 
+        no_normal_shader.use();
+        no_normal_shader.setMat4("view", view);
+        no_normal_shader.setMat4("projection", projection);
+        // point light 1
+        no_normal_shader.setVec3("lights[0].position", glm::vec3{hallway_width - 0.5f, hallway_height - 0.5f, -3.f * hallway_length / 4.f});
+        no_normal_shader.setVec3("lights[0].ambient", settings.ambient1.r, settings.ambient1.g, settings.ambient1.b);
+        no_normal_shader.setVec3("lights[0].diffuse", settings.diffuse1.r, settings.diffuse1.g, settings.diffuse1.b);
+        no_normal_shader.setVec3("lights[0].specular", settings.specular1.r, settings.specular1.g, settings.specular1.b);
+        no_normal_shader.setFloat("lights[0].constant", settings.constant);
+        no_normal_shader.setFloat("lights[0].linear", settings.linear);
+        no_normal_shader.setFloat("lights[0].quadratic", settings.quadratic);
+        // point light 2
+        no_normal_shader.setVec3("lights[1].position", glm::vec3{hallway_width / 2, hallway_height - 0.5f, -0.5f});
+        no_normal_shader.setVec3("lights[1].ambient", settings.ambient.r, settings.ambient.g, settings.ambient.b);
+        no_normal_shader.setVec3("lights[1].diffuse", settings.diffuse.r, settings.diffuse.g, settings.diffuse.b);
+        no_normal_shader.setVec3("lights[1].specular", settings.specular.r, settings.specular.g, settings.specular.b);
+        no_normal_shader.setFloat("lights[1].constant", settings.constant);
+        no_normal_shader.setFloat("lights[1].linear", settings.linear);
+        no_normal_shader.setFloat("lights[1].quadratic", settings.quadratic);
+
+        no_normal_shader.setFloat("shininess", settings.shininess);
+        no_normal_shader.setVec3("viewPos", state.camera.Position);
+
+        shader.use();
+
         for (auto& plane : planes) {
             plane.draw(shader);
         }
 
-        shader.use();
-
         {
             // arcade machine
+            shader.use();
             TextureGroup::unbind();
             glm::mat4 model(1.f);
             model = glm::translate(model, glm::vec3(0.55f, 0.f, -hallway_length / 3.f));
@@ -705,6 +721,7 @@ int main() {
 
         {
             // trash
+            shader.use();
             TextureGroup::unbind();
             glm::mat4 model(1.f);
             model = glm::translate(model, glm::vec3(hallway_width / 2.f, 0.f, -1.f));
@@ -714,13 +731,14 @@ int main() {
 
         {
             // doors
+            no_normal_shader.use();
             TextureGroup::unbind();
             glm::mat4 model(1.0f);
             model = glm::translate(model, glm::vec3(hallway_width - 0.1f, 0.f, -hallway_length / 2.f));
             model = glm::rotate(model, -glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
-            shader.setMat4("model", model);
-            door_model.Draw(shader);
-            shader.setMat4("model",
+            no_normal_shader.setMat4("model", model);
+            door_model.Draw(no_normal_shader);
+            no_normal_shader.setMat4("model",
                            glm::rotate(
                                    glm::translate(glm::mat4(1.f),
                                                   glm::vec3(hallway_width - 0.1f, 0.f, -hallway_length / 4.f)),
@@ -728,11 +746,12 @@ int main() {
                                    glm::vec3(0.f, 1.f, 0.f)
                            )
             );
-            door_model.Draw(shader);
+            door_model.Draw(no_normal_shader);
         }
 
         {
             // ramen machine
+            shader.use();
             TextureGroup::unbind();
             glm::mat4 model(1.f);
             model = glm::translate(model, glm::vec3(0.4, 0.f, - 2.f * hallway_length / 3.f));
@@ -744,6 +763,7 @@ int main() {
 
         {
             // poster
+            shader.use();
             TextureGroup::unbind();
             glm::mat4 model(1.f);
             model = glm::translate(model, glm::vec3(hallway_width - 0.03f, hallway_height / 2.f, - 3.f * hallway_length / 4.f));
@@ -755,6 +775,7 @@ int main() {
 
         {
             // bottle
+            shader.use();
             TextureGroup::unbind();
             glm::mat4 model(1.f);
             model = glm::translate(model, glm::vec3(hallway_width / 2.f, 0.1f, -hallway_length / 2.f));
@@ -766,6 +787,7 @@ int main() {
 
         {
             // lamp
+            shader.use();
             TextureGroup::unbind();
             glm::mat4 model(1.0f);
             model = glm::translate(model, glm::vec3{hallway_width / 2, hallway_height, -0.2f});
