@@ -1,4 +1,24 @@
-# Models and Textures
+# Cyberpunk Hallway - Computer Graphics Project
+
+## Keybindings
+- Q or F1 - open/close settings and help
+- W A S D - move
+- ESC - close settings or window
+
+## Implemented Elements
+### Basic
+- Blending
+- Face culling
+- Advanced lighting
+- Model
+### Optional
+#### Group A
+- Framebuffers
+#### Group B
+- Normal mapping, Parallax Mapping
+- HDR, Bloom
+
+## Models and Textures
 1. Checker Tiles 01 - Pixel-Furnace (https://textures.pixel-furnace.com/texture?name=Checker%20Tiles%2001)
 2. Dirty Concrete - Pixel-Furnace (https://textures.pixel-furnace.com/texture?name=Dirty%20Concrete)
 3. "Lamp" (https://skfb.ly/ouMZ8) by Shedmon is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
