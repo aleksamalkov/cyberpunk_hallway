@@ -38,16 +38,16 @@ struct Settings
 {
     glm::vec3 ambient {0.05f, 0.05f, 0.05f};
     glm::vec3 diffuse {0.8f, 2.8f, 0.8f};
-    glm::vec3 specular {3.0f, 2.5f, 1.0f};
+    glm::vec3 specular {3.0f, 4.5f, 1.0f};
     glm::vec3 ambient1 {0.05f, 0.05f, 0.05f};
     glm::vec3 diffuse1 {1.8f, 0.8f, 0.8f};
-    glm::vec3 specular1 {3.5f, 2.0f, 1.0f};
+    glm::vec3 specular1 {4.0f, 2.0f, 1.0f};
     float constant = 1.0f;
     float linear = 0.9f;
     float quadratic = 0.24f;
     float shininess = 32.0f;
     float gamma = 2.2f;
-    float exposure = 0.8f;
+    float exposure = 0.65f;
     float height = 0.01f;
     int min_layers = 4;
     int max_layers = 8;
@@ -714,7 +714,7 @@ int main() {
             glm::mat4 model(1.f);
             model = glm::translate(model, glm::vec3(0.55f, 0.f, -hallway_length / 3.f));
             model = glm::rotate(model, glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
-            model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));
+            model = glm::scale(model, glm::vec3(0.45f, 0.45f, 0.45f));
             shader.setMat4("model", model);
             arcade_model.Draw(shader);
         }
@@ -761,7 +761,7 @@ int main() {
             glm::mat4 model(1.f);
             model = glm::translate(model, glm::vec3(0.4, 0.f, - 2.f * hallway_length / 3.f));
             model = glm::rotate(model, glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
-            model = glm::scale(model, glm::vec3(1.2f, 1.2f, 1.2f));
+            model = glm::scale(model, glm::vec3(1.4f, 1.4f, 1.4f));
             shader.setMat4("model", model);
             vending_model.Draw(shader);
         }
