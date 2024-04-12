@@ -53,6 +53,7 @@ struct Settings
     int max_layers = 8;
     bool bloom = true;
     int blur_amount = 4;
+    float view_angle = 60;
 };
 
 unsigned load_texture(const std::string& filename, bool gamma_correction = false) {
@@ -281,12 +282,13 @@ private:
 
 struct State
 {
-    Camera camera{};
+    Camera camera{glm::vec3{2.5f, 1.5f, -8.0f}, glm::vec3{0.f, 1.f, 0.f}, 90.f};
     double mouse_pos_x{};
     double mouse_pos_y{};
     bool gui_enabled{};
     int window_width{1280};
     int window_height{720};
+    bool is_mouse_initialized{};
 };
 
 std::vector<Plane> generate_hallway(float width, float height, float length, TextureGroup floor_tex, TextureGroup wall_tex, TextureGroup ceiling_tex)
@@ -348,25 +350,30 @@ void draw_gui(Settings& settings, const FPS_counter& fps_counter)
 
     ImGui::Begin("Settings");
     ImGui::SetWindowPos({10, 70}, ImGuiCond_Once);
-    ImGui::SetWindowSize({470, 350}, ImGuiCond_Once);
+    ImGui::SetWindowSize({550, 550}, ImGuiCond_Once);
     ImGui::SetWindowCollapsed(false, ImGuiCond_Once);
+    ImGui::DragFloat("gamma", &settings.gamma, 0.005, 0.0f, 4.0f);
+    ImGui::DragFloat("exposure", &settings.exposure, 0.005, 0.0f, 4.0f);
+    ImGui::DragFloat("view_angle", &settings.view_angle, 0.1, 20.0f, 90.0f);
     ImGui::ColorEdit3("ambient", reinterpret_cast<float *>(&settings.ambient));
     ImGui::ColorEdit3("diffuse", reinterpret_cast<float *>(&settings.diffuse));
     ImGui::ColorEdit3("specular", reinterpret_cast<float *>(&settings.specular));
     ImGui::ColorEdit3("ambient1", reinterpret_cast<float *>(&settings.ambient1));
     ImGui::ColorEdit3("diffuse1", reinterpret_cast<float *>(&settings.diffuse1));
     ImGui::ColorEdit3("specular1", reinterpret_cast<float *>(&settings.specular1));
-    ImGui::DragFloat("pointLight.constant", &settings.constant, 0.005, 0.0, 2.0);
-    ImGui::DragFloat("pointLight.linear", &settings.linear, 0.005, 0.0, 2.0);
-    ImGui::DragFloat("pointLight.quadratic", &settings.quadratic, 0.005, 0.0, 2.0);
-    ImGui::DragFloat("material.shininess", &settings.shininess, 0.25, 0.0, 1000.0);
-    ImGui::DragFloat("gamma", &settings.gamma, 0.005, 0.0f, 4.0f);
-    ImGui::DragFloat("exposure", &settings.exposure, 0.005, 0.0f, 4.0f);
-    ImGui::DragFloat("height", &settings.height, 0.0005, 0.00f, 1.0f);
-    ImGui::DragInt("min_layers", &settings.min_layers, 1, 1, 1000);
-    ImGui::DragInt("max_layers", &settings.max_layers, 1, 1, 1000);
+    ImGui::DragFloat("attenuation.constant", &settings.constant, 0.005, 0.0, 2.0);
+    ImGui::DragFloat("attenuation.linear", &settings.linear, 0.005, 0.0, 2.0);
+    ImGui::DragFloat("attenuation.quadratic", &settings.quadratic, 0.005, 0.0, 2.0);
+    ImGui::DragFloat("shininess", &settings.shininess, 0.25, 0.0, 1000.0);
+    ImGui::DragFloat("height", &settings.height, 0.00005, 0.00f, 0.5f);
+    ImGui::DragInt("min_layers", &settings.min_layers, 0.1, 1, 512);
+    ImGui::DragInt("max_layers", &settings.max_layers, 0.1, 1, 512);
     ImGui::Checkbox("bloom", &settings.bloom);
-    ImGui::DragInt("bloom blur amount", &settings.blur_amount, 1, 0, 100);
+    ImGui::DragInt("bloom blur amount", &settings.blur_amount, 0.2, 0, 50);
+    ImGui::Text("Keybindings:");
+    ImGui::BulletText("Q or F1 - open/close settings and help");
+    ImGui::BulletText("W A S D - move");
+    ImGui::BulletText("ESC - close settings or window");
     ImGui::End();
 
     ImGui::Render();
@@ -536,7 +543,7 @@ int main() {
     std::cout << "\nCompiling shaders..." << std::endl;
     std::cout << "Compiling main shader" << std::endl;
     Shader shader("resources/shaders/shader.vs", "resources/shaders/shader.fs");
-    std::cout << "Compiling bright shader" << std::endl;
+    std::cout << "Compiling bright fragment extraction shader" << std::endl;
     Shader bright_shader("resources/shaders/screen.vs", "resources/shaders/bright.fs");
     std::cout << "Compiling blur shaders" << std::endl;
     Shader blur_vertical_shader("resources/shaders/screen.vs", "resources/shaders/blur_vertical.fs");
@@ -622,8 +629,6 @@ int main() {
     std::cout << "\nLoading done\n" << std::endl;
 
     constexpr glm::vec3 clear_color{0.0f, 0.0f, 0.0f};
-    state.camera.Position += glm::vec3{2.5f, 1.5f, -5.0f};
-    state.camera.Front = glm::vec3{0.0f, 0.0f, -1.0f};
 
     FPS_counter fps_counter;
 
@@ -648,7 +653,7 @@ int main() {
         glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        const auto projection = glm::perspective(glm::radians(60.0f),
+        const auto projection = glm::perspective(glm::radians(settings.view_angle),
                                                  static_cast<float>(state.window_width) / static_cast<float>(state.window_height),
                                                  0.1f, 100.0f);
 
@@ -859,6 +864,12 @@ void process_input(GLFWwindow *window, State& state, float delta_time){
 void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos)
 {
     auto* state = static_cast<State*>(glfwGetWindowUserPointer(window));
+
+    if (!state->is_mouse_initialized) {
+        state->mouse_pos_x = xpos;
+        state->mouse_pos_y = ypos;
+        state->is_mouse_initialized = true;
+    }
 
     const double x_offset = xpos - state->mouse_pos_x;
     state->mouse_pos_x = xpos;
