@@ -17,7 +17,7 @@
 #include <stdexcept>
 #include <vector>
 
-// executes and action on the exit from scope
+// executes an action on the exit from scopes
 // from the book "A Tour Of C++" by Bjarne Stroustrup
 template <class F>
 struct Final_action {
@@ -733,11 +733,13 @@ int main() {
             // doors
             no_normal_shader.use();
             TextureGroup::unbind();
+
             glm::mat4 model(1.0f);
             model = glm::translate(model, glm::vec3(hallway_width - 0.1f, 0.f, -hallway_length / 2.f));
             model = glm::rotate(model, -glm::pi<float>() / 2.f, glm::vec3(0.f, 1.f, 0.f));
             no_normal_shader.setMat4("model", model);
             door_model.Draw(no_normal_shader);
+
             no_normal_shader.setMat4("model",
                            glm::rotate(
                                    glm::translate(glm::mat4(1.f),
@@ -746,6 +748,9 @@ int main() {
                                    glm::vec3(0.f, 1.f, 0.f)
                            )
             );
+            door_model.Draw(no_normal_shader);
+
+            no_normal_shader.setMat4("model", glm::translate(glm::mat4(1.f), glm::vec3(hallway_width / 2.0f, 0.f, -hallway_length + 0.1f)));
             door_model.Draw(no_normal_shader);
         }
 
@@ -778,8 +783,9 @@ int main() {
             shader.use();
             TextureGroup::unbind();
             glm::mat4 model(1.f);
-            model = glm::translate(model, glm::vec3(hallway_width / 2.f, 0.1f, -hallway_length / 2.f));
+            model = glm::translate(model, glm::vec3(hallway_width / 3.f, 0.07f, -hallway_length / 2.f));
             model = glm::rotate(model, glm::pi<float>() / 2.f, glm::vec3(1.f, 0.f, 0.f));
+            model = glm::rotate(model, -glm::pi<float>() / 12.f, glm::vec3(0.f, 0.f, 1.f));
             model = glm::scale(model, glm::vec3(0.01f, 0.01f, 0.01f));
             shader.setMat4("model", model);
             bottle_model.Draw(shader);
